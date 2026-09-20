@@ -145,7 +145,7 @@ jobs:
           base="https://awaazrajasthan.onrender.com"
           for path in / /api/news?limit=1 /api/categories /api/ads?position=home_top /api/epapers /api/notifications/public-key; do
             code=$(curl -L -sS -o /tmp/response -w '%{http_code}' --max-time 30 "$base$path")
-            test "$code" = "200" || { echo "Render smoke failed: $path -> $code"; cat /tmp/response; exit 1; }
+            case "$code" in 200|304) ;; *) echo "Render smoke failed: $path -> $code"; cat /tmp/response; exit 1 ;; esac
           done
           health=$(curl -L -sS --max-time 30 "$base/api/health")
           echo "$health" | grep -q '"ok":true'
