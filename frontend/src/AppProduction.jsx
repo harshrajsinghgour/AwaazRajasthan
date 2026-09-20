@@ -23,7 +23,7 @@ function normalize(item, index = 0) {
   return {
     id: String(item?._id || item?.id || `api-${index}`), category: item?.category || "राजस्थान", title: item?.title || "ताज़ा खबर",
     excerpt: item?.excerpt || item?.summary || item?.description || "", content: item?.content || item?.body || item?.article || "",
-    image: item?.image || item?.imageUrl || item?.thumbnail || fallback.image, video: mediaUrl(item?.video || item?.videoUrl || item?.mediaVideo || ""),
+    image: mediaUrl(item?.image || item?.imageUrl || item?.thumbnail || fallback.image), video: mediaUrl(item?.video || item?.videoUrl || item?.mediaVideo || ""),
     time: item?.publishedAt || item?.createdAt ? formatDate(item.publishedAt || item.createdAt) : item?.time || "अभी",
     location: item?.location || item?.city || "राजस्थान", author: item?.author || item?.reporter || "आवाज़ राजस्थान",
     featured: Boolean(item?.featured), latest: item?.latest !== false, breaking: Boolean(item?.breaking), views: Number(item?.views || 0), slug: item?.slug || ""
