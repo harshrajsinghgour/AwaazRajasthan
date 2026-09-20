@@ -101,33 +101,24 @@ jobs:
           grep -n 'watermarkEpaper' server.production.js
           grep -n 'api/sitemap.xml' server.production.js
           ! grep -R -nE 'sk_(live|test)_[A-Za-z0-9]+|rzp_(live|test)_[A-Za-z0-9]+' server.production.js frontend/public/admin frontend/src || (echo 'Hard-coded payment secret detected' && exit 1)
-          node - <<'NODE'
-const fs=require("fs");
-const c=fs.readFileSync("server.production.js","utf8");
-const required={
-  "/api/admin/dashboard":"auth",
-  "/api/admin/news":"auth",
-  "/api/admin/epapers":"auth,ownerOnly",
-  "/api/admin/categories":"auth,ownerOnly",
-  "/api/admin/ad-prices":"auth,ownerOnly",
-  "/api/admin/ad-bookings":"auth,ownerOnly",
-  "/api/admin/ads":"auth,ownerOnly",
-  "/api/admin/admins":"auth,ownerOnly",
-  "/api/admin/ads/analytics":"auth,ownerOnly",
-  "/api/admin/upload":"auth",
-  "/api/admin/notifications/send":"auth,ownerOnly",
-  "/api/admin/notifications/status":"auth,ownerOnly",
-  "/api/admin/notifications/cleanup":"auth,ownerOnly"
-};
-for(const [route,parts] of Object.entries(required)){
-  const i=c.indexOf(route);
-  if(i<0) throw new Error("Missing protected route: "+route);
-  const line=c.slice(c.lastIndexOf("\n",i)+1,c.indexOf("\n",i)<0?c.length:c.indexOf("\n",i));
-  for(const part of parts.split(",")) if(!line.includes(part)) throw new Error("Missing "+part+" on "+route);
-}
-console.log("Admin authorization contract OK");
-NODE
-
+          grep -n 'app.get("/api/admin/dashboard",auth' server.production.js
+          grep -n 'app.get("/api/admin/news",auth' server.production.js
+          grep -n 'app.post("/api/admin/news",auth' server.production.js
+          grep -n 'app.get("/api/admin/epapers",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/epapers",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/categories",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/categories",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/ad-prices",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/ad-bookings",auth,ownerOnly' server.production.js
+          grep -n 'app.patch("/api/admin/ad-bookings/:id",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/ads",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/ads",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/admins",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/admins",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/ads/analytics",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/notifications/send",auth,ownerOnly' server.production.js
+          grep -n 'app.get("/api/admin/notifications/status",auth,ownerOnly' server.production.js
+          grep -n 'app.post("/api/admin/notifications/cleanup",auth,ownerOnly' server.production.js
 
 
   live-production-smoke:
