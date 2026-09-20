@@ -13,6 +13,7 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import Razorpay from "razorpay";
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
@@ -35,6 +36,28 @@ app.use(cors({
   credentials: true,
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"]
 }));
+app.post("/api/payments/webhook", express.raw({ type: "application/json", limit: "1mb" }), async (req, res) => {
+  try {
+    const secret = String(process.env.RAZORPAY_WEBHOOK_SECRET || "").trim();
+    const signature = String(req.headers["x-razorpay-signature"] || "").trim();
+    if (!secret || !signature) return res.status(400).json({ message: "Webhook verification is not configured" });
+    const expected = crypto.createHmac("sha256", secret).update(req.body).digest("hex");
+    if (!safeEqualHex(expected, signature)) return res.status(401).json({ message: "Invalid webhook signature" });
+    const event = JSON.parse(req.body.toString("utf8"));
+    const paymentEntity = event?.payload?.payment?.entity;
+    const orderId = paymentEntity?.order_id;
+    if (orderId) {
+      const update = { paymentId: paymentEntity.id, status: event.event === "payment.failed" ? "failed" : "paid", signatureVerified: true };
+      if (paymentEntity.error_description) update.failureReason = paymentEntity.error_description;
+      await Payment.findOneAndUpdate({ orderId }, update, { new: true });
+    }
+    return res.json({ ok: true });
+  } catch (e) {
+    console.error("Razorpay webhook error", e);
+    return res.status(400).json({ message: "Invalid webhook payload" });
+  }
+});
+
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 app.use(cookieParser());
@@ -97,6 +120,20 @@ const News = mongoose.model("News", newsSchema);
 const Ad = mongoose.model("Ad", adSchema);
 const Admin = mongoose.model("Admin", adminSchema);
 const Subscriber = mongoose.model("Subscriber", subscriberSchema);
+
+const paymentSchema = new mongoose.Schema({
+  orderId: { type: String, unique: true, sparse: true, index: true },
+  paymentId: { type: String, unique: true, sparse: true, index: true },
+  receipt: { type: String, required: true, index: true },
+  amount: { type: Number, required: true, min: 100 },
+  currency: { type: String, default: "INR", enum: ["INR"] },
+  status: { type: String, enum: ["created","paid","failed","refunded"], default: "created", index: true },
+  signatureVerified: { type: Boolean, default: false },
+  notes: { type: mongoose.Schema.Types.Mixed, default: {} },
+  failureReason: { type: String, default: "" }
+}, { timestamps: true });
+
+const Payment = mongoose.model("Payment", paymentSchema);
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -195,6 +232,54 @@ app.post("/api/ads/:id/click", async (req,res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({message:"Invalid ad id"});
   await Ad.updateOne({_id:req.params.id},{$inc:{clicks:1}});
   res.status(204).end();
+});
+
+app.post("/api/payments/create-order", async (req, res, next) => {
+  try {
+    const { client, keyId } = getRazorpay();
+    const amount = Math.round(Number(req.body?.amount));
+    if (!Number.isInteger(amount) || amount < 1 || amount > 50000000) {
+      return res.status(400).json({ message: "Amount must be an integer number of paise between 1 and 50,000,000." });
+    }
+    const receipt = String(req.body?.receipt || ("awaaz_" + crypto.randomUUID())).slice(0, 40);
+    const notes = req.body?.notes && typeof req.body.notes === "object" ? req.body.notes : {};
+    const order = await client.orders.create({ amount, currency: "INR", receipt, notes });
+    await Payment.create({ orderId: order.id, receipt, amount, currency: "INR", notes, status: "created" });
+    res.status(201).json({ keyId, orderId: order.id, amount: order.amount, currency: order.currency, receipt });
+  } catch (e) {
+    console.error("Razorpay create-order error", e);
+    next(Object.assign(e, { statusCode: e.statusCode || 502 }));
+  }
+});
+
+app.post("/api/payments/verify", async (req, res, next) => {
+  try {
+    const { keySecret } = getRazorpay();
+    const orderId = String(req.body?.razorpay_order_id || "");
+    const paymentId = String(req.body?.razorpay_payment_id || "");
+    const signature = String(req.body?.razorpay_signature || "");
+    if (!orderId || !paymentId || !signature) return res.status(400).json({ verified: false, message: "Payment verification fields are required." });
+    const expected = razorpaySignature(orderId, paymentId, keySecret);
+    if (!safeEqualHex(expected, signature)) return res.status(400).json({ verified: false, message: "Invalid Razorpay payment signature." });
+    const payment = await Payment.findOneAndUpdate(
+      { orderId },
+      { paymentId, status: "paid", signatureVerified: true },
+      { new: true }
+    );
+    if (!payment) return res.status(404).json({ verified: false, message: "Payment order not found." });
+    res.json({ verified: true, payment: { orderId: payment.orderId, paymentId: payment.paymentId, amount: payment.amount, currency: payment.currency, status: payment.status } });
+  } catch (e) {
+    console.error("Razorpay verify error", e);
+    next(Object.assign(e, { statusCode: e.statusCode || 502 }));
+  }
+});
+
+app.get("/api/payments/:orderId", async (req, res, next) => {
+  try {
+    const payment = await Payment.findOne({ orderId: String(req.params.orderId) }).select("orderId paymentId receipt amount currency status signatureVerified createdAt updatedAt").lean();
+    if (!payment) return res.status(404).json({ message: "Payment order not found." });
+    res.json({ payment });
+  } catch (e) { next(e); }
 });
 
 app.post("/api/notifications/subscribe", async(req,res,next)=>{
@@ -305,7 +390,7 @@ app.use((err,_req,res,_next)=>{
   console.error(err);
   if(err?.code===11000)return res.status(409).json({message:"Duplicate value"});
   if(err instanceof multer.MulterError)return res.status(400).json({message:err.message});
-  res.status(500).json({message:"Server error"});
+  res.status(err?.statusCode || 500).json({message:err?.statusCode ? err.message : "Server error"});
 });
 
 mongoose.connect(process.env.MONGODB_URI).then(async()=>{await ensureOwner();app.listen(PORT,()=>console.log("Awaaz Rajasthan API running on :"+PORT));}).catch(err=>{console.error("MongoDB connection failed",err);process.exit(1);});
