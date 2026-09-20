@@ -3,7 +3,7 @@ services:
     name: awaaz-rajasthan-api
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && npm audit --omit=dev --json || true
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -52,7 +52,7 @@ services:
     name: awaaz-rajasthan-push-worker
     runtime: node
     rootDir: backend
-    buildCommand: npm install
+    buildCommand: npm install && npm audit --omit=dev --json || true
     startCommand: npm run push-worker
     envVars:
       - key: NODE_VERSION
