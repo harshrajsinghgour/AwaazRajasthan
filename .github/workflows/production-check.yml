@@ -86,6 +86,23 @@ jobs:
           grep -n '404.*410\|404 || error?.statusCode === 410' push-worker.js
           grep -n 'PUSH_WORKER_CONCURRENCY' push-worker.js
 
+      - name: Validate production security contracts
+        run: |
+          grep -n 'if(PROD&&!JWT_SECRET)' server.production.js
+          grep -n 'app.post("/api/admin/login",rateLimit' server.production.js
+          grep -n 'ownerOnly' server.production.js
+          grep -n 'api/admin/ads' server.production.js
+          grep -n 'api/admin/ad-prices' server.production.js
+          grep -n 'files:1' server.production.js
+          grep -n 'fieldNestingDepth:3' server.production.js
+          grep -n 'isHttpsUrl' server.production.js
+          grep -n 'Razorpay webhook is not configured' server.production.js
+          grep -n 'timingSafeEqual' server.production.js
+          grep -n 'watermarkEpaper' server.production.js
+          grep -n 'FRONTEND_URL.*api/sitemap' server.production.js
+          ! grep -R -nE 'sk_(live|test)_[A-Za-z0-9]+|rzp_(live|test)_[A-Za-z0-9]+' server.production.js frontend/public/admin frontend/src || (echo 'Hard-coded payment secret detected' && exit 1)
+
+
   live-production-smoke:
     name: Live production smoke test
     runs-on: ubuntu-latest
