@@ -17,7 +17,10 @@ function safeNotificationUrl(value) {
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then(async (cache) => {
+        const results = await Promise.allSettled(APP_SHELL.map((url) => cache.add(url)));
+        if (results.every((result) => result.status === "rejected")) throw new Error("No app-shell asset could be cached");
+      })
       .then(() => self.skipWaiting())
   );
 });
