@@ -66,6 +66,10 @@ jobs:
         run: node --check server.production.js
       - name: Verify push worker syntax
         run: node --check push-worker.js
+      - name: Diagnose production dependency audit
+        run: |
+          npm audit --omit=dev --json > /tmp/audit.json || true
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8')); console.log(JSON.stringify(a,null,2))"
       - name: Verify package start command
         run: node -e "const p=require('./package.json'); if(p.scripts?.start!=='node server.production.js') throw new Error('package start must use server.production.js'); if(p.scripts?.['push-worker']!=='node push-worker.js') throw new Error('push-worker script must use push-worker.js'); console.log('Backend commands OK')"
       - name: Validate backend production contracts
