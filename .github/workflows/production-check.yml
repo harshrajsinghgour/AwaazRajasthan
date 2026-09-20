@@ -86,6 +86,33 @@ jobs:
           grep -n '404.*410\|404 || error?.statusCode === 410' push-worker.js
           grep -n 'PUSH_WORKER_CONCURRENCY' push-worker.js
 
+  live-production-smoke:
+    name: Live production smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Render public API
+        run: |
+          set -euo pipefail
+          base="https://awaazrajasthan.onrender.com"
+          for path in / /api/news?limit=1 /api/categories /api/ads?position=home_top /api/epapers /api/notifications/public-key; do
+            code=$(curl -L -sS -o /tmp/response -w '%{http_code}' --max-time 30 "$base$path")
+            test "$code" = "200" || { echo "Render smoke failed: $path -> $code"; cat /tmp/response; exit 1; }
+          done
+          sitemap=$(curl -L -sS --max-time 30 "$base/api/sitemap.xml")
+          echo "$sitemap" | grep -q '<urlset'
+          echo "Render live API smoke OK"
+      - name: Verify Vercel public shell and SEO assets
+        run: |
+          set -euo pipefail
+          base="https://awaazrajasthan.vercel.app"
+          for path in / /manifest.webmanifest /robots.txt /sitemap.xml /news/__production_smoke__; do
+            code=$(curl -L -sS -o /tmp/response -w '%{http_code}' --max-time 30 "$base$path")
+            test "$code" = "200" || { echo "Vercel smoke failed: $path -> $code"; cat /tmp/response; exit 1; }
+          done
+          curl -L -sS --max-time 30 "$base/manifest.webmanifest" | grep -q 'आवाज़ राजस्थान'
+          curl -L -sS --max-time 30 "$base/robots.txt" | grep -q 'Sitemap:'
+          echo "Vercel live shell/SEO smoke OK"
+
   deployment-config:
     name: Deployment configuration
     runs-on: ubuntu-latest
