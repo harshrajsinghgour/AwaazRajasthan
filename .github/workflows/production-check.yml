@@ -109,12 +109,12 @@ jobs:
           grep -n 'api/sitemap.xml' server.production.js
           ! grep -R -nE 'sk_(live|test)_[A-Za-z0-9]+|rzp_(live|test)_[A-Za-z0-9]+' server.production.js frontend/public/admin frontend/src || (echo 'Hard-coded payment secret detected' && exit 1)
           grep -n 'app.post("/api/admin/logout",optionalAuth' server.production.js
-          grep -q 'if(req.admin){req.admin.sessionVersion' server.production.js
+          grep -Fq 'if(req.admin){req.admin.sessionVersion' server.production.js
           grep -n 'async function optionalAuth' server.production.js
-          grep -q 'newsSchema.index({status:1,featured:-1,publishedAt:-1,createdAt:-1})' server.production.js
-          grep -q 'adSchema.index({position:1,status:1,device:1,createdAt:-1})' server.production.js
-          grep -q 'await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,AdPrice,AdminOtp].map(model=>model.createIndexes()))' server.production.js
-          grep -q 'const database=mongoose.connection.readyState===1?"connected":"disconnected"' server.production.js
+          grep -Fq 'newsSchema.index({status:1,featured:-1,publishedAt:-1,createdAt:-1})' server.production.js
+          grep -Fq 'adSchema.index({position:1,status:1,device:1,createdAt:-1})' server.production.js
+          grep -Fq 'await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,AdPrice,AdminOtp].map(model=>model.createIndexes()))' server.production.js
+          grep -Fq 'const database=mongoose.connection.readyState===1?"connected":"disconnected"' server.production.js
           grep -n 'app.get("/api/admin/dashboard",auth' server.production.js
           grep -n 'app.get("/api/admin/news",auth' server.production.js
           grep -n 'app.post("/api/admin/news",auth' server.production.js
