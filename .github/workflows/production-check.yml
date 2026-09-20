@@ -46,6 +46,11 @@ jobs:
           node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('frontend/public/manifest.webmanifest','utf8')); if(m.name!=='आवाज़ राजस्थान'||m.lang!=='hi-IN'||m.display!=='standalone') throw new Error('PWA manifest branding/display contract failed'); if(!Array.isArray(m.icons)||!m.icons.length) throw new Error('PWA icons missing'); console.log('PWA manifest OK')"
           grep -q 'serviceWorker' frontend/src/main.jsx
           grep -q 'awaaz-rajasthan' frontend/public/sw.js
+          grep -q 'Promise.allSettled' frontend/public/sw.js
+          grep -q 'FrontendErrorBoundary' frontend/src/main.jsx
+          grep -q 'sessionStorage.setItem("awaaz-last-runtime-error"' frontend/src/main.jsx
+          node --check frontend/public/sw.js
+          node --check frontend/src/main.jsx
 
   backend-install:
     name: Backend dependency and syntax check
