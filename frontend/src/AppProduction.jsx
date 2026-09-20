@@ -260,9 +260,10 @@ export default function AppProduction() {
   useEffect(() => { writeStorage("awaaz-bookmarks", JSON.stringify(saved)); writeStorage("awaaz-saved-news", JSON.stringify(savedItems)); }, [saved, savedItems]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
-    const raw = window.location.hash.match(/^#news-(.+)$/);
-    if (!raw) return;
-    let id = raw[1];
+    const hashMatch = window.location.hash.match(/^#news-(.+)$/);
+    const pathMatch = window.location.pathname.match(/^\/news\/([^/]+)\/?$/);
+    if (!hashMatch && !pathMatch) return;
+    let id = (hashMatch || pathMatch)[1];
     try { id = decodeURIComponent(id); } catch {}
     const found = news.find(n => String(n.id) === id || String(n.slug || "") === id);
     if (found) {
@@ -301,7 +302,7 @@ export default function AppProduction() {
   function toggleSave(id) { const key = String(id); const exists = saved.includes(key); if (exists) { const nextSaved = saved.filter(x => String(x) !== key); const nextItems = savedItems.filter(x => String(x.id || x._id) !== key); setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव से हटाई गई"); } else { const item = news.find(n => String(n.id || n._id) === key) || (article && String(article.id || article._id) === key ? article : null); if (!item) return; const nextSaved = [key, ...saved.filter(x => String(x) !== key)]; const nextItems = [item, ...savedItems.filter(x => String(x.id || x._id) !== key)]; setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव हो गई"); } }
   async function share(item) { const slugOrId = encodeURIComponent(item.slug || item.id), url = `${window.location.origin}/news/${slugOrId}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt, url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
   async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (!API_BASE || String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
-  function closeArticle() { setArticle(null); window.history.replaceState(null, "", window.location.pathname + window.location.search); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  function closeArticle() { setArticle(null); const target = window.location.pathname.startsWith("/news/") ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
 
   async function enableNotifications() {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotifyState("error"); setToast("इस डिवाइस पर पुश नोटिफिकेशन उपलब्ध नहीं है"); return; }
