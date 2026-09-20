@@ -135,7 +135,15 @@ jobs:
             article=$(curl -L -sS --max-time 30 "$base/api/news/$encoded_id")
             echo "$article" | grep -q '"news"'
           fi
-          echo "Render live API contract smoke OK"
+          # Public endpoints must work without admin auth.
+          # Protected endpoints must not accidentally become public.
+          admin_code=$(curl -L -sS -o /tmp/admin_response -w '%{http_code}' --max-time 30 "$base/api/admin/me")
+          test "$admin_code" = "401" || { echo "Admin auth boundary failed: /api/admin/me -> $admin_code"; cat /tmp/admin_response; exit 1; }
+          upload_code=$(curl -L -sS -o /tmp/upload_response -w '%{http_code}' --max-time 30 -X POST "$base/api/admin/upload")
+          test "$upload_code" = "401" || { echo "Upload auth boundary failed: /api/admin/upload -> $upload_code"; cat /tmp/upload_response; exit 1; }
+          notify_code=$(curl -L -sS -o /tmp/notify_response -w '%{http_code}' --max-time 30 -X POST -H 'Content-Type: application/json' --data '{"endpoint":"https://example.invalid/push","keys":{"p256dh":"x","auth":"y"}}' "$base/api/notifications/subscribe")
+          test "$notify_code" = "400" || { echo "Push validation boundary failed: /api/notifications/subscribe -> $notify_code"; cat /tmp/notify_response; exit 1; }
+          echo "Render live API + auth boundary smoke OK"
       - name: Verify Vercel public shell and SEO assets
         run: |
           set -euo pipefail
