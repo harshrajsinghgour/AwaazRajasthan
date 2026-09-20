@@ -98,9 +98,26 @@ jobs:
             code=$(curl -L -sS -o /tmp/response -w '%{http_code}' --max-time 30 "$base$path")
             test "$code" = "200" || { echo "Render smoke failed: $path -> $code"; cat /tmp/response; exit 1; }
           done
+          health=$(curl -L -sS --max-time 30 "$base/api/health")
+          echo "$health" | grep -q '"ok":true'
+          news=$(curl -L -sS --max-time 30 "$base/api/news?limit=1")
+          echo "$news" | grep -q '"pagination"'
+          categories=$(curl -L -sS --max-time 30 "$base/api/categories")
+          echo "$categories" | grep -q '"categories"'
+          ads=$(curl -L -sS --max-time 30 "$base/api/ads?position=home_top")
+          echo "$ads" | grep -q '"ads"'
+          epapers=$(curl -L -sS --max-time 30 "$base/api/epapers")
+          echo "$epapers" | grep -q '"epapers"'
+          pushkey=$(curl -L -sS --max-time 30 "$base/api/notifications/public-key")
+          echo "$pushkey" | grep -q '"publicKey"'
           sitemap=$(curl -L -sS --max-time 30 "$base/api/sitemap.xml")
           echo "$sitemap" | grep -q '<urlset'
-          echo "Render live API smoke OK"
+          article_id=$(node -e "const x=JSON.parse(process.env.NEWS); const n=x.news?.[0]; if(n) process.stdout.write(String(n.slug||n._id||''))" NEWS="$news")
+          if [ -n "$article_id" ]; then
+            article=$(curl -L -sS --max-time 30 "$base/api/news/$(python3 -c 'import urllib.parse,os; print(urllib.parse.quote(os.environ["ID"],safe=""))' ID="$article_id")")
+            echo "$article" | grep -q '"news"'
+          fi
+          echo "Render live API contract smoke OK"
       - name: Verify Vercel public shell and SEO assets
         run: |
           set -euo pipefail
