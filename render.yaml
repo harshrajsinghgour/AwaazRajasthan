@@ -3,12 +3,10 @@ services:
     name: awaaz-rajasthan-api
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npm audit --omit=dev --json || true
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_VERSION
-        value: 20.19.5
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
@@ -52,11 +50,9 @@ services:
     name: awaaz-rajasthan-push-worker
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npm audit --omit=dev --json || true
+    buildCommand: npm install
     startCommand: npm run push-worker
     envVars:
-      - key: NODE_VERSION
-        value: 20.19.5
       - key: NODE_ENV
         value: production
       - key: MONGODB_URI
