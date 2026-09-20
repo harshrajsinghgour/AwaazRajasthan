@@ -225,7 +225,7 @@ async function getAdPrices(){
   const base=Number(x.ratePerDay||AD_BOOKING_RATES[x.position]||0);
   const imageRate=Number.isFinite(Number(x.imageRatePerDay))?Number(x.imageRatePerDay):base;
   const videoRate=Number.isFinite(Number(x.videoRatePerDay))?Number(x.videoRatePerDay):Math.max(base,Math.round(base*1.5));
-  return {...x,ratePerDay:rate,imageRatePerDay:imageRate,videoRatePerDay:videoRate};
+  return {...x,ratePerDay:base,imageRatePerDay:imageRate,videoRatePerDay:videoRate};
  };
  if(rows.length)return rows.map(mapRow);
  return AD_POSITIONS.map(position=>{
