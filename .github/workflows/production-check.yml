@@ -1,0 +1,109 @@
+name: Awaaz Rajasthan Production Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-build:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Validate Vercel configuration
+        working-directory: .
+        run: node -e "const fs=require('fs'); const v=JSON.parse(fs.readFileSync('frontend/vercel.json','utf8')); if(!Array.isArray(v.rewrites)||!Array.isArray(v.headers)) throw new Error('Invalid frontend/vercel.json'); if(!v.rewrites.some(x=>x.source==='/news/:id*'&&x.destination==='/index.html')) throw new Error('Article rewrite missing'); console.log('Vercel configuration OK')"
+      - name: Validate frontend production contracts
+        working-directory: .
+        run: |
+          ! grep -R -n 'home_mid' frontend/src frontend/public/admin || (echo 'Unsupported ad position home_mid found; use home_inline' && exit 1)
+          grep -R -n 'home_inline' frontend/src/AppProduction.jsx
+          grep -R -n 'api/ads' frontend/src/AppProduction.jsx
+          grep -R -n 'api/notifications/subscribe' frontend/src/AppProduction.jsx
+          grep -R -n 'api/news/\${encodeURIComponent' frontend/src/AppProduction.jsx
+          grep -R -n '/news/' frontend/src/article-route.js frontend/src/seo-runtime.js
+          grep -R -n 'NewsArticle' frontend/src/seo-runtime.js
+      - name: Validate PWA metadata
+        working-directory: .
+        run: |
+          node -e "const fs=require('fs'); const m=JSON.parse(fs.readFileSync('frontend/public/manifest.webmanifest','utf8')); if(m.name!=='आवाज़ राजस्थान'||m.lang!=='hi-IN'||m.display!=='standalone') throw new Error('PWA manifest branding/display contract failed'); if(!Array.isArray(m.icons)||!m.icons.length) throw new Error('PWA icons missing'); console.log('PWA manifest OK')"
+          grep -q 'serviceWorker' frontend/src/main.jsx
+          grep -q 'awaaz-rajasthan' frontend/public/sw.js
+
+  backend-install:
+    name: Backend dependency and syntax check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: npm install
+      - name: Verify production server syntax
+        run: node --check server.production.js
+      - name: Verify push worker syntax
+        run: node --check push-worker.js
+      - name: Verify package start command
+        run: node -e "const p=require('./package.json'); if(p.scripts?.start!=='node server.production.js') throw new Error('package start must use server.production.js'); if(p.scripts?.['push-worker']!=='node push-worker.js') throw new Error('push-worker script must use push-worker.js'); console.log('Backend commands OK')"
+      - name: Validate backend production contracts
+        run: |
+          grep -n 'ownerOnly' server.production.js
+          grep -n 'api/admin/upload' server.production.js
+          grep -n 'api/notifications/subscribe' server.production.js
+          grep -n 'api/ads/:id/impression' server.production.js
+          grep -n 'api/ads/:id/click' server.production.js
+          grep -n 'findOneAndUpdate.*views' server.production.js
+          grep -n 'slug:key' server.production.js
+          grep -n 'sessionVersion' server.production.js
+      - name: Validate push worker contracts
+        run: |
+          grep -n 'claimDelivery' push-worker.js
+          grep -n 'markSent' push-worker.js
+          grep -n 'status.*sent' push-worker.js
+          grep -n '404.*410\|404 || error?.statusCode === 410' push-worker.js
+          grep -n 'PUSH_WORKER_CONCURRENCY' push-worker.js
+
+  deployment-config:
+    name: Deployment configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate deployment files and PWA assets
+        run: |
+          test -f frontend/public/manifest.webmanifest
+          test -f frontend/public/sw.js
+          test -f frontend/public/robots.txt
+          test -f frontend/public/404.html
+          test -f frontend/public/og-default.svg
+          test -f frontend/public/app-icon.svg
+          test -f render.yaml
+          test -f backend/server.production.js
+          test -f backend/push-worker.js
+          node -e "JSON.parse(require('fs').readFileSync('frontend/public/manifest.webmanifest','utf8')); console.log('manifest.webmanifest JSON OK')"
+          node --check frontend/public/sw.js
+          node -e "const fs=require('fs'); const y=fs.readFileSync('render.yaml','utf8'); for(const key of ['awaaz-rajasthan-api','awaaz-rajasthan-push-worker','MONGODB_URI','VAPID_PUBLIC_KEY','VAPID_PRIVATE_KEY','VAPID_SUBJECT']) if(!y.includes(key)) throw new Error('Render contract missing: '+key); console.log('Render configuration OK')"
+          echo "Deployment files and PWA assets OK"

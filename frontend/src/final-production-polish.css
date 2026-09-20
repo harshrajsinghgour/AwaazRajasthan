@@ -1,0 +1,58 @@
+/* Awaaz Rajasthan — final production UI polish */
+:root{--wa-safe-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-behavior:smooth;scroll-padding-top:120px}
+body{overflow-x:hidden;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button,a,input,select{touch-action:manipulation}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+.hero-card,.compact-card,.news-row,.side-card,.quick-tools>*{transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.hero-card:hover,.compact-card:hover,.news-row:hover{transform:translateY(-2px)}
+.quick-tools>*:hover{border-color:var(--red);transform:translateY(-1px)}
+.ad-slot{position:relative}
+.ad-slot:after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit}
+.article-backdrop{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.article-modal{overscroll-behavior:contain}
+.article-content{max-width:920px;margin:0 auto}
+.article-body{overflow-wrap:anywhere}
+.article-body img,.article-body iframe,.article-body video{max-width:100%;height:auto;border-radius:12px}
+.mobile-bottom-nav{padding-bottom:var(--wa-safe-bottom)}
+.drawer{padding-bottom:calc(18px + var(--wa-safe-bottom))}
+@media (max-width:767px){
+  html{scroll-padding-top:92px}
+  .container{width:min(100% - 20px,1180px)}
+  .site-header{backdrop-filter:blur(16px)}
+  .header-top{height:64px}
+  .brand-mark{width:44px;height:44px;flex-basis:44px}
+  .brand strong{font-size:18px}
+  .brand small{font-size:9px}
+  .hero-grid{grid-template-columns:1fr}
+  .hero-image-wrap{height:240px}
+  .hero-copy{padding:15px}
+  .hero-copy h2{font-size:21px}
+  .content-layout{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .news-row{grid-template-columns:112px 1fr;gap:10px;padding:8px}
+  .news-row>img{width:112px;height:92px}
+  .news-row h3{font-size:14px;line-height:1.42}
+  .news-row p{display:none}
+  .row-bottom{font-size:10px}
+  .district-grid{grid-template-columns:repeat(3,1fr)}
+  .quick-tools{grid-template-columns:repeat(2,1fr)}
+  .welcome-row{align-items:flex-start}
+  .welcome-row h1{font-size:25px}
+  .top-ad{min-height:70px;margin-bottom:14px}
+  .mid-ad{min-height:70px;margin:16px 0}
+  .article-cover{height:260px}
+  .article-content{padding:18px 15px calc(35px + var(--wa-safe-bottom))}
+  .article-content h1{font-size:27px}
+  .article-lead{font-size:16px}
+  .article-body p{font-size:15px;line-height:1.85}
+  .site-footer{padding-bottom:calc(82px + var(--wa-safe-bottom))}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media (min-width:768px){
+  .mobile-bottom-nav{display:none!important}
+  .article-modal{min-height:100vh}
+}

@@ -1,0 +1,44 @@
+{
+  "id": "/",
+  "name": "आवाज़ राजस्थान",
+  "short_name": "आवाज़ राजस्थान",
+  "description": "राजस्थान की ताज़ा, स्थानीय और विश्वसनीय खबरें",
+  "lang": "hi-IN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f5f7",
+  "theme_color": "#07111f",
+  "categories": ["news", "regional", "politics"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/awaazrajasthan-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "ताज़ा खबरें",
+      "short_name": "ताज़ा खबरें",
+      "description": "आवाज़ राजस्थान की नवीनतम खबरें देखें",
+      "url": "/?section=latest"
+    },
+    {
+      "name": "खोजें",
+      "short_name": "खोजें",
+      "description": "खबरों और विषयों को खोजें",
+      "url": "/?section=search"
+    },
+    {
+      "name": "बुकमार्क",
+      "short_name": "बुकमार्क",
+      "description": "सहेजी हुई खबरें देखें",
+      "url": "/?section=saved"
+    }
+  ]
+}

@@ -39,7 +39,6 @@ function mediaUrl(src) {
   try { return new URL(value, `${API_BASE}/`).href; } catch { return value; }
 }
 function safeImage(src) { return mediaUrl(src) || "/news-placeholder.svg"; }
-function normalizeSavedItem(item) { if (!item || typeof item !== "object") return null; const id = String(item.id || item._id || "").trim(); if (!id) return null; return { ...item, id, image: mediaUrl(item.image || item.imageUrl || item.thumbnail || ""), video: mediaUrl(item.video || item.videoUrl || item.mediaVideo || "") }; }
 function readStorage(key, fallback = null) { try { return window.localStorage.getItem(key) ?? fallback; } catch { return fallback; } }
 function readStorageJson(key, fallback = []) { try { const raw = readStorage(key, ""); if (!raw) return fallback; const value = JSON.parse(raw); return Array.isArray(value) ? value : fallback; } catch { return fallback; } }
 function writeStorage(key, value) { try { window.localStorage.setItem(key, value); } catch {} }
@@ -222,20 +221,9 @@ function EpaperPage() {
 export default function AppProduction() {
   if(window.location.pathname==="/epaper") return <EpaperPage />;
   const [news, setNews] = useState(FALLBACK), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false);
-  const [saved, setSaved] = useState(() => { try { const bookmarks = readStorageJson("awaaz-bookmarks", []).map(x => String(x)).filter(Boolean); const items = readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean); return [...new Set([...bookmarks, ...items.map(x => String(x.id))])]; } catch { return []; } }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
+  const [saved, setSaved] = useState(() => { try { return readStorageJson("awaaz-bookmarks", []); } catch { return []; } }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).filter(x => x && typeof x === "object" && x.id)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
   const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => {
-        const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
-        if (!cancelled && names.length) setCategories(["होम", ...names.filter(x => x !== "होम" && x !== "सभी जिले"), "सभी जिले"]);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
-  const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
+  useEffect(() => {\n    let cancelled = false;\n    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })\n      .then(r => r.ok ? r.json() : Promise.reject())\n      .then(data => {\n        const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];\n        if (!cancelled && names.length) setCategories(["होम", ...names.filter(x => x !== "होम" && x !== "सभी जिले"), "सभी जिले"]);\n      })\n      .catch(() => {});\n    return () => { cancelled = true; };\n  }, []);\n  const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
   useEffect(() => {
     if (vapidPublicKey || !API_BASE) return;
     let cancelled = false;
