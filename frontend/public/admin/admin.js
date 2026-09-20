@@ -27,9 +27,9 @@ async function boot(){initApiBase();try{me=(await api("/api/admin/me")).admin;sh
 function showLogin(){$("login").classList.remove("hidden");$("panel").classList.add("hidden")}
 function hasPermission(permission){return me?.role==="owner" || (Array.isArray(me?.permissions) && me.permissions.includes(permission));}
 function applyPermissionUI(){
- const owner=me?.role==="owner", newsRead=hasPermission("news:read")||hasPermission("news:write"), newsWrite=hasPermission("news:write"), mediaWrite=hasPermission("media:write"), newsDelete=hasPermission("news:delete");
+ const owner=me?.role==="owner", newsRead=hasPermission("news:read"), newsWrite=hasPermission("news:write"), mediaWrite=hasPermission("media:write"), newsDelete=hasPermission("news:delete"), newsAny=newsRead||newsWrite||newsDelete;
  const tabNews=document.querySelector('[data-tab="news"]');
- if(tabNews) tabNews.style.display=newsRead?"":"none";
+ if(tabNews) tabNews.style.display=newsAny?"":"none";
  [["ads",owner],["admins",owner],["epaper",owner],["categories",owner],["adbookings",owner],["adfees",owner],["adpricing",owner]].forEach(([id,ok])=>{const b=document.querySelector('[data-tab="'+id+'"]');if(b)b.style.display=ok?"":"none";});
  $("notificationControl")?.classList.toggle("hidden",!owner);
  $("newNews")?.classList.toggle("hidden",!newsWrite);
@@ -67,7 +67,7 @@ $("resetForgotPassword")?.addEventListener("click",async()=>{
 });
 $("logout").onclick=async()=>{try{await api("/api/admin/logout",{method:"POST"})}finally{location.reload()}};
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button,.tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");$(b.dataset.tab).classList.add("active")});
-$("goBreaking").onclick=()=>{document.querySelector('[data-tab="news"]').click();$("newsForm").classList.remove("hidden");scrollTo(0,0)};
+$("goBreaking").onclick=()=>{if(!newsWrite)return toast("आपको News Write permission नहीं दी गई है।");document.querySelector('[data-tab="news"]').click();$("newsForm").classList.remove("hidden");scrollTo(0,0)};
 
 $("sendNotificationForm").onsubmit=async e=>{e.preventDefault();const title=$("pushTitle").value.trim(),body=$("pushBody").value.trim(),url=$("pushUrl").value.trim()||"/";if(!title||!body){toast("Title और message दोनों भरें");return;}const btn=$("sendPush");btn.disabled=true;btn.textContent="Sending...";try{const r=await api("/api/admin/notifications/send",{method:"POST",body:JSON.stringify({title,body,url})});toast(`Notification भेजा गया: ${Number(r.sent||0)} devices`);$("sendNotificationForm").reset();await loadNotificationStatus();}catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="Notification भेजें";}};
 $("refreshNotifications").onclick=async()=>{const b=$("refreshNotifications");b.disabled=true;b.textContent="Refreshing...";try{await loadNotificationStatus();toast("Notification status refreshed")}catch{}finally{b.disabled=false;b.textContent="Status Refresh"}};
@@ -119,7 +119,7 @@ window.deleteAdBooking=async id=>{if(!confirm("यह ad booking और उस�
 $("refreshAdBookings")?.addEventListener("click",loadAdBookings);
 $("bookingStatusFilter")?.addEventListener("change",loadAdBookings);
 
-async function loadAll(){await loadDashboard();if(hasPermission("news:read")||hasPermission("news:write")){await refreshCategories();await loadNews()}if(me.role==="owner")await Promise.all([refreshCategories(),loadAds(),loadAdBookings(),loadAdFees(),loadAdPrices(),loadAdmins(),loadOtpAdmins(),loadNotificationStatus(),loadCategories(),loadEpapers()])}
+async function loadAll(){await loadDashboard();if(hasPermission("news:read")||hasPermission("news:write")||hasPermission("news:delete")){await refreshCategories();if(hasPermission("news:read"))await loadNews()}if(me.role==="owner")await Promise.all([refreshCategories(),loadAds(),loadAdBookings(),loadAdFees(),loadAdPrices(),loadAdmins(),loadOtpAdmins(),loadNotificationStatus(),loadCategories(),loadEpapers()])}
 async function uploadEpaper(file){if(!file||file.type!=="application/pdf")throw new Error("केवल PDF ई-पेपर चुनें।");const base=getApiBase(),form=new FormData();form.append("file",file);const r=await fetch(base+"/api/admin/epapers/upload",{method:"POST",credentials:"include",body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"E-paper upload failed");return d.url||d.pdf;}
 async function loadEpapers(){if(me?.role!=="owner")return;try{const r=await api("/api/admin/epapers");const items=r.epapers||[];$("epaperList").innerHTML=items.map(x=>'<div class="list-row"><div><b>'+esc(x.title||"ई-पेपर")+'</b><small>'+esc(formatDate(x.issueDate))+' · '+esc(x.status)+'</small></div><div><button onclick="window.open('+JSON.stringify(x.pdf.startsWith("http")?x.pdf:getApiBase()+x.pdf)+',"_blank")">Open PDF</button><button class="danger" onclick="deleteEpaper(this.dataset.id)" data-id="'+esc(x._id)+'">Delete</button></div></div>').join("")||"<p>अभी कोई ई-पेपर upload नहीं है।</p>"}catch(e){$("epaperList").innerHTML="<p>"+esc(e.message)+"</p>"}}
 $("epaperFile")?.addEventListener("change",e=>{const f=e.target.files?.[0];$("epaperFileName").innerHTML=f?"<b>"+esc(f.name)+"</b> · "+(f.size/1024/1024).toFixed(2)+" MB":"<span>केवल PDF चुनें।</span>"});
