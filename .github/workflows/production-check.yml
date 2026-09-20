@@ -111,6 +111,10 @@ jobs:
           grep -n 'app.post("/api/admin/logout",optionalAuth' server.production.js
           grep -q 'if(req.admin){req.admin.sessionVersion' server.production.js
           grep -n 'async function optionalAuth' server.production.js
+          grep -q 'newsSchema.index({status:1,featured:-1,publishedAt:-1,createdAt:-1})' server.production.js
+          grep -q 'adSchema.index({position:1,status:1,device:1,createdAt:-1})' server.production.js
+          grep -q 'await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,AdPrice,AdminOtp].map(model=>model.createIndexes()))' server.production.js
+          grep -q 'const database=mongoose.connection.readyState===1?"connected":"disconnected"' server.production.js
           grep -n 'app.get("/api/admin/dashboard",auth' server.production.js
           grep -n 'app.get("/api/admin/news",auth' server.production.js
           grep -n 'app.post("/api/admin/news",auth' server.production.js
