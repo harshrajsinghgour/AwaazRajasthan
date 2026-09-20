@@ -112,9 +112,10 @@ jobs:
           echo "$pushkey" | grep -q '"publicKey"'
           sitemap=$(curl -L -sS --max-time 30 "$base/api/sitemap.xml")
           echo "$sitemap" | grep -q '<urlset'
-          article_id=$(node -e "const x=JSON.parse(process.env.NEWS); const n=x.news?.[0]; if(n) process.stdout.write(String(n.slug||n._id||''))" NEWS="$news")
+          article_id=$(node -e 'const x=JSON.parse(process.argv[1]); const n=x.news?.[0]; if(n) process.stdout.write(String(n.slug||n._id||""))' "$news")
           if [ -n "$article_id" ]; then
-            article=$(curl -L -sS --max-time 30 "$base/api/news/$(python3 -c 'import urllib.parse,os; print(urllib.parse.quote(os.environ["ID"],safe=""))' ID="$article_id")")
+            encoded_id=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$article_id")
+            article=$(curl -L -sS --max-time 30 "$base/api/news/$encoded_id")
             echo "$article" | grep -q '"news"'
           fi
           echo "Render live API contract smoke OK"
