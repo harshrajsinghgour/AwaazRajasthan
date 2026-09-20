@@ -16,7 +16,7 @@ import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import webpush from "web-push";
 import nodemailer from "nodemailer";
-import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PDFDocument, rgb } from "pdf-lib";
 import Razorpay from "razorpay";
@@ -63,16 +63,48 @@ const adImpressionLimiter=rateLimit({windowMs:15*60*1000,limit:120,standardHeade
 const adClickLimiter=rateLimit({windowMs:15*60*1000,limit:60,standardHeaders:"draft-8",legacyHeaders:false});
 const subscriptionLimiter=rateLimit({windowMs:60*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false});
 app.use("/uploads",express.static(uploadDir,{maxAge:"7d",immutable:true}));
-app.get("/api/media/*",async(req,res,next)=>{
+app.get(/^\/api\/media\/(.+)$/,async(req,res,next)=>{
  try{
   if(!B2_ENABLED)return res.status(503).json({message:"B2 storage is not configured"});
   const raw=String(req.params[0]||"").replace(/^\/+/, "");
-  const key=raw.split("/").map(decodeURIComponent).join("/");
-  if(!key||key.includes("..")||key.startsWith("/"))return res.status(400).json({message:"Invalid media key"});
-  const url=await getB2SignedUrl(key);
-  res.set("Cache-Control","private, max-age=300");
-  return res.redirect(302,url);
- }catch(e){next(e);}
+  let key;
+  try{key=raw.split("/").map(decodeURIComponent).join("/");}catch{return res.status(400).json({message:"Invalid media key"});}
+  if(!key||key.includes("..")||key.startsWith("/")||key.includes("\\0"))return res.status(400).json({message:"Invalid media key"});
+
+  const head=await b2.send(new HeadObjectCommand({Bucket:B2_BUCKET_NAME,Key:key}));
+  const size=Number(head.ContentLength||0);
+  const contentType=String(head.ContentType||"application/octet-stream");
+  const range=String(req.headers.range||"").trim();
+
+  res.set("Accept-Ranges","bytes");
+  res.set("Content-Type",contentType);
+  res.set("Cache-Control","public, max-age=31536000, immutable");
+  if(head.ETag)res.set("ETag",head.ETag);
+
+  if(range && size>0){
+   const match=/^bytes=(\\d*)-(\\d*)$/.exec(range);
+   if(!match)return res.status(416).set("Content-Range",`bytes */${size}`).end();
+   let start=match[1]?Number(match[1]):0;
+   let end=match[2]?Number(match[2]):size-1;
+   if(!match[1]&&match[2]){const suffix=Number(match[2]);if(!Number.isFinite(suffix)||suffix<=0)return res.status(416).set("Content-Range",`bytes */${size}`).end();start=Math.max(0,size-suffix);}
+   if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||start>=size||end<start){return res.status(416).set("Content-Range",`bytes */${size}`).end();}
+   end=Math.min(end,size-1);
+   const length=end-start+1;
+   const obj=await b2.send(new GetObjectCommand({Bucket:B2_BUCKET_NAME,Key:key,Range:`bytes=${start}-${end}`}));
+   res.status(206);
+   res.set("Content-Range",`bytes ${start}-${end}/${size}`);
+   res.set("Content-Length",String(length));
+   return obj.Body.pipe(res);
+  }
+
+  if(size>0)res.set("Content-Length",String(size));
+  const obj=await b2.send(new GetObjectCommand({Bucket:B2_BUCKET_NAME,Key:key}));
+  return obj.Body.pipe(res);
+ }catch(e){
+  const code=String(e?.$metadata?.httpStatusCode||e?.Code||e?.name||"");
+  if(code==="NotFound"||code==="NoSuchKey"||code==="404")return res.status(404).json({message:"Media not found"});
+  next(e);
+ }
 });
 app.use("/epapers",express.static(epaperDir,{maxAge:"1h"}));
 
