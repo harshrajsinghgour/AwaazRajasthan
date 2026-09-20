@@ -9,7 +9,8 @@
   "scripts": {
     "start": "node server.production.js",
     "dev": "node --watch server.production.js",
-    "push-worker": "node push-worker.js"
+    "push-worker": "node push-worker.js",
+    "postinstall": "node -e \"const c=require('child_process');try{const a=JSON.parse(c.execFileSync('npm',['audit','--omit=dev','--json'],{encoding:'utf8'})); console.log('AUDIT_VULNERABILITIES',JSON.stringify(a.vulnerabilities||{}));}catch(e){try{const a=JSON.parse(e.stdout||'{}'); console.log('AUDIT_VULNERABILITIES',JSON.stringify(a.vulnerabilities||{}));}catch{console.log('AUDIT_DIAGNOSTIC_FAILED')}}\""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",
