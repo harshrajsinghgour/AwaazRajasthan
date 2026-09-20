@@ -49,6 +49,9 @@ jobs:
           grep -q 'Promise.allSettled' frontend/public/sw.js
           grep -q 'FrontendErrorBoundary' frontend/src/main.jsx
           grep -q 'sessionStorage.setItem("awaaz-last-runtime-error"' frontend/src/main.jsx
+          ! grep -n 'awaaz_admin_token' frontend/public/admin/admin.js
+          ! grep -n 'localStorage.setItem.*token' frontend/public/admin/admin.js
+          ! grep -n 'res.json({admin:safe(a),token:' backend/server.production.js || true
           node --check frontend/public/sw.js
 
   backend-install:
