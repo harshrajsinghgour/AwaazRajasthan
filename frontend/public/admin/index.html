@@ -1,37 +1,33 @@
 <!doctype html>
 <html lang="hi">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07111f"><title>आवाज़ राजस्थान — Admin</title><link rel="stylesheet" href="/admin/admin.css?v=20260920-login4"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07111f"><title>आवाज़ राजस्थान — Admin</title><link rel="stylesheet" href="/admin/admin.css?v=20260920-login5"></head>
 <body>
 <div id="app">
 <section id="login" class="login">
   <div class="login-shell">
     <aside class="login-visual" aria-hidden="true">
-      <div class="visual-map"></div>
-      <div class="visual-brand">आवाज़ राजस्थान</div>
-      <div class="visual-line"></div>
-      <h2>राजस्थान<br>की हर आवाज़,<br><strong>आप तक।</strong></h2>
-      <div class="visual-rule"></div>
-      <p>LOCAL<br>NEWS<br>BIGGER<br>IMPACT</p>
-      <div class="visual-heritage">राजस्थान • सत्य • जनहित</div>
+      <div class="visual-map"></div><div class="visual-brand">आवाज़ राजस्थान</div><div class="visual-line"></div>
+      <h2>राजस्थान<br>की हर आवाज़,<br><strong>आप तक।</strong></h2><div class="visual-rule"></div>
+      <p>LOCAL<br>NEWS<br>BIGGER<br>IMPACT</p><div class="visual-heritage">राजस्थान • सत्य • जनहित</div>
     </aside>
     <div class="login-card">
-      <div class="admin-brand-logo">
-        <img src="/awaazrajasthan-logo.png" alt="आवाज़ राजस्थान लोगो" onerror="this.style.display='none';this.parentElement.classList.add('logo-fallback')">
-      </div>
+      <div class="admin-brand-logo"><img src="/awaazrajasthan-logo.png" alt="आवाज़ राजस्थान लोगो"></div>
       <div class="login-kicker">SECURE ADMIN CONSOLE</div>
       <h1>आवाज़ राजस्थान</h1>
       <p class="login-tagline">सच के साथ, राजस्थान के लिए</p>
-      <form id="loginForm">
-        <label class="login-field"><span>✉</span><input id="email" name="email" type="email" inputmode="email" placeholder="Admin email" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-        <label class="login-field"><span>♙</span><input id="password" name="password" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required><button type="button" class="password-toggle" aria-label="Show password" onclick="const p=document.getElementById('password');p.type=p.type==='password'?'text':'password';this.textContent=p.type==='password'?'◉':'◌'">◉</button></label>
-        <div class="login-options">
-          <label class="remember"><input id="rememberLogin" type="checkbox"> <span>मुझे याद रखें</span></label>
-          <span class="forgot">सुरक्षित लॉगिन</span>
+      <form id="loginForm" method="post" action="https://awaazrajasthan.onrender.com/api/admin/login" autocomplete="on" novalidate>
+        <div class="native-login-field">
+          <label for="email">Admin Email</label>
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" required>
         </div>
-        <button class="login-submit" type="submit"><span>↪</span> Login</button>
-        <div class="login-divider"><span>या</span></div>
-        <div class="secure-note"><span>◇</span><div><b>यह एक सुरक्षित प्रशासनिक क्षेत्र है।</b><small>केवल अधिकृत उपयोगकर्ताओं के लिए।</small></div></div>
-        <div id="loginStatus" class="login-status" role="status" aria-live="polite"></div><small id="loginError"></small>
+        <div class="native-login-field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="go" required>
+        </div>
+        <label class="remember"><input id="rememberLogin" type="checkbox"> <span>मुझे याद रखें</span></label>
+        <button id="loginSubmit" class="login-submit" type="submit">↪ Login</button>
+        <div id="loginStatus" class="login-status" role="status" aria-live="polite"></div>
+        <small id="loginError"></small>
       </form>
       <div class="forgot-password-box">
         <button type="button" id="openForgotPassword" class="forgot-password-btn">🔐 Password भूल गए? Email OTP से बदलें</button>
@@ -51,6 +47,7 @@
     </div>
   </div>
 </section>
+
 <section id="panel" class="hidden">
 <header class="topbar"><div><b>आवाज़ राजस्थान</b><span>Admin Console</span></div><div class="topbar-right"><span id="permissionSummary" class="permission-summary">Admin</span><button id="logout">Logout</button></div></header>
 <nav class="tabs"><button data-tab="dashboard" class="active">Dashboard</button><button data-tab="news">News</button><button data-tab="adbookings">📢 Ad Bookings <i>OWNER</i></button><button data-tab="adfees">💳 Ad Fees Done <i>OWNER</i></button><button data-tab="adpricing">💰 Ad Prices <i>OWNER</i></button><button data-tab="categories">श्रेणियां <small>OWNER</small></button><button data-tab="epaper">ई-पेपर <small>OWNER</small></button><button data-tab="ads">Ads <i>OWNER</i></button><button data-tab="admins">Admins</button></nav>
@@ -65,6 +62,6 @@
 </main>
 </section>
 </div>
-<script src="/admin/admin.js?v=20260920-login4"></script>
+<script src="/admin/admin.js?v=20260920-login5"></script>
 </body>
 </html>
