@@ -144,18 +144,18 @@ const boundedText=(value,max)=>String(value??"").trim().slice(0,max);
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
 async function storeUploadedFile(file,folder){
  if(!file) throw new Error("File required");
- const local=()=>({key:null,url:`${PUBLIC_API_URL}/uploads/${file.filename}`,relativeUrl:`/uploads/${file.filename}`,storage:"local"});
- if(!B2_ENABLED) return local();
+ if(!B2_ENABLED) throw new Error("B2 durable storage is not configured");
+ const key=b2ObjectKey(folder,file);
  try{
-  const key=b2ObjectKey(folder,file);
   await b2.send(new PutObjectCommand({Bucket:B2_BUCKET_NAME,Key:key,Body:fs.createReadStream(file.path),ContentType:file.mimetype,CacheControl:"public, max-age=31536000, immutable"}));
-  try{fs.unlinkSync(file.path)}catch{}
-  const relative=`/api/media/${key.split("/").map(encodeURIComponent).join("/")}`;
-  return {key,url:`${PUBLIC_API_URL}${relative}`,relativeUrl:relative,storage:"b2"};
  }catch(error){
-  console.error("B2 upload failed; using local storage fallback:",error?.name||error?.Code||error?.message||error);
-  return local();
+  console.error("B2 upload failed:",error?.name||error?.Code||error?.message||error);
+  throw new Error("Media could not be stored in Backblaze B2");
+ }finally{
+  try{fs.unlinkSync(file.path)}catch{}
  }
+ const relative="/api/media/"+key.split("/").map(encodeURIComponent).join("/");
+ return {key,url:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
 }
 async function getB2SignedUrl(key){
  if(!B2_ENABLED) return null;
@@ -287,12 +287,8 @@ app.post("/api/admin/epapers/upload",auth,ownerOnly,upload.single("file"),async(
  try{
   if(!req.file||req.file.mimetype!=="application/pdf")return res.status(400).json({message:"केवल PDF ई-पेपर स्वीकार है।"});
   await watermarkEpaper(req.file.path);
-  if(B2_ENABLED){
-   const stored=await storeUploadedFile(req.file,"epapers");
-   return res.status(201).json({pdf:stored.relativeUrl,url:stored.url,filename:req.file.originalname,storage:"b2"});
-  }
-  const filename=path.basename(req.file.filename),pdf="/epapers/"+filename;
-  res.status(201).json({pdf,url:PUBLIC_API_URL+pdf,filename,storage:"local"});
+  const stored=await storeUploadedFile(req.file,"epapers");
+  return res.status(201).json({pdf:stored.relativeUrl,url:stored.url,filename:req.file.originalname,storage:"b2"});
  }catch(e){next(e)}
 });
 app.post("/api/admin/epapers",auth,ownerOnly,async(req,res,next)=>{try{const b=req.body||{},title=String(b.title||"आज का ई-पेपर").trim(),issueDate=new Date(b.issueDate||"");if(!Number.isFinite(issueDate.getTime()))return res.status(400).json({message:"Valid issue date required"});if(!b.pdf)return res.status(400).json({message:"PDF required"});const item=await Epaper.create({title,issueDate,pdf:String(b.pdf),status:b.status==="draft"?"draft":"published"});res.status(201).json({epaper:item})}catch(e){next(e)}});
@@ -326,5 +322,5 @@ app.post("/api/admin/upload",auth,permissions("media:write"),upload.single("file
 app.get("/api/admin/ads/analytics",auth,ownerOnly,async(_r,res,next)=>{try{const ads=await Ad.find({}).select("title position device status startDate endDate impressions clicks createdAt").sort({createdAt:-1}).lean();res.json({analytics:ads.map(a=>({...a,ctr:a.impressions?Number(((a.clicks/a.impressions)*100).toFixed(2)):0}))});}catch(e){next(e);}});
 app.use((err,_req,res,_next)=>{console.error(err);res.status(err.status||500).json({message:PROD?"Server error":String(err.message||err)});});
 const DEFAULT_CATEGORY_ROWS=[["राजस्थान","🏜️",1],["जयपुर","🏛️",2],["जोधपुर","🏰",3],["उदयपुर","🌊",4],["कोटा","🎓",5],["अजमेर","🕌",6],["भीलवाड़ा","🏭",7],["अपराध","🚨",8],["राजनीति","🏛️",9],["शिक्षा","📚",10],["नौकरी","💼",11],["खेल","🏆",12],["देश","🇮🇳",13],["दुनिया","🌍",14],["मनोरंजन","🎬",15],["बिजनेस","📈",16]];
-async function bootstrap(){if(!process.env.MONGODB_URI){if(PROD)throw new Error("MONGODB_URI is required in production");return;}await mongoose.connect(process.env.MONGODB_URI);await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));const email=String(process.env.OWNER_EMAIL||"harshrajsinghgour1@gmail.com").toLowerCase().trim(),password=String(process.env.OWNER_PASSWORD||"");if(email&&password){const hash=await bcrypt.hash(password,12);await Admin.updateOne({email},{$setOnInsert:{name:"harshraj singh gour",email,passwordHash:hash,role:"owner",permissions:["news:read","news:write","news:delete","media:write"],active:true,sessionVersion:0}},{upsert:true});}app.listen(PORT,async()=>{ console.log(`Awaaz Rajasthan API listening on ${PORT}`); const b2Status=await verifyB2Storage(); console.log(`B2 storage: ${b2Status.ok?"READY":b2Status.reason}`); if(process.env.ENABLE_PUSH_WORKER!=="false" && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT){ const worker=spawn(process.execPath,[path.join(process.cwd(),"backend","push-worker.js")],{stdio:"inherit",env:process.env}); worker.on("exit",(code,signal)=>console.log(`Push worker exited: code=${code??""} signal=${signal??""}`)); worker.on("error",error=>console.error("Push worker process error:",error)); } else console.log("Push worker not started: VAPID configuration is not complete or ENABLE_PUSH_WORKER=false"); });}
+async function bootstrap(){if(!process.env.MONGODB_URI){if(PROD)throw new Error("MONGODB_URI is required in production");return;}if(PROD&&!B2_ENABLED)throw new Error("B2 durable media storage is required in production");await mongoose.connect(process.env.MONGODB_URI);await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));const email=String(process.env.OWNER_EMAIL||"harshrajsinghgour1@gmail.com").toLowerCase().trim(),password=String(process.env.OWNER_PASSWORD||"");if(email&&password){const hash=await bcrypt.hash(password,12);await Admin.updateOne({email},{$setOnInsert:{name:"harshraj singh gour",email,passwordHash:hash,role:"owner",permissions:["news:read","news:write","news:delete","media:write"],active:true,sessionVersion:0}},{upsert:true});}const b2Status=await verifyB2Storage();if(PROD&&!b2Status.ok)throw new Error(`B2 storage verification failed: ${b2Status.reason}`);app.listen(PORT,async()=>{ console.log(`Awaaz Rajasthan API listening on ${PORT}`); console.log(`B2 storage: ${b2Status.ok?"READY":b2Status.reason}`); if(process.env.ENABLE_PUSH_WORKER!=="false" && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT){ const worker=spawn(process.execPath,[path.join(process.cwd(),"backend","push-worker.js")],{stdio:"inherit",env:process.env}); worker.on("exit",(code,signal)=>console.log(`Push worker exited: code=${code??""} signal=${signal??""}`)); worker.on("error",error=>console.error("Push worker process error:",error)); } else console.log("Push worker not started: VAPID configuration is not complete or ENABLE_PUSH_WORKER=false"); });}
 bootstrap().catch(e=>{console.error(e);process.exit(1);});
