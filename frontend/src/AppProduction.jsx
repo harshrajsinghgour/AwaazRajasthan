@@ -264,7 +264,13 @@ export default function AppProduction() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
-        if (!cancelled && names.length) {\n          const ordered = names.filter(x => x !== "होम" && x !== "सभी जिले");\n          const bhilwaraIndex = ordered.indexOf("भीलवाड़ा");\n          const insertAt = bhilwaraIndex >= 0 ? bhilwaraIndex + 1 : ordered.length;\n          ordered.splice(insertAt, 0, "सभी जिले");\n          setCategories(["होम", ...ordered]);\n        }
+        if (!cancelled && names.length) {
+          const ordered = names.filter(x => x !== "होम" && x !== "सभी जिले");
+          const bhilwaraIndex = ordered.indexOf("भीलवाड़ा");
+          const insertAt = bhilwaraIndex >= 0 ? bhilwaraIndex + 1 : ordered.length;
+          ordered.splice(insertAt, 0, "सभी जिले");
+          setCategories(["होम", ...ordered]);
+        }
       })
       .catch(() => {});
     return () => { cancelled = true; };
