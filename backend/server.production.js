@@ -242,7 +242,7 @@ async function getAdPrices(){
   return {position,label:DEFAULT_AD_PRICE_META[position]?.label||position,description:DEFAULT_AD_PRICE_META[position]?.description||"",ratePerDay:base,imageRatePerDay:base,videoRatePerDay:Math.max(base,Math.round(base*1.5)),active:true};
  });
 }
-app.get("/api/ad-bookings/options",async(_req,res,next)=>{try{const rows=await getAdPrices();res.json({positions:rows,payment:{provider:"razorpay",upiQr:true}})}catch(e){next(e)}});
+app.get("/api/ad-bookings/options",async(_req,res,next)=>{try{const rows=await getAdPrices();res.json({positions:rows,payment:{provider:"razorpay",checkout:true,upiQr:false}})}catch(e){next(e)}});
 
 const bookingUploadLimiter=rateLimit({windowMs:60*60*1000,limit:12,standardHeaders:"draft-8",legacyHeaders:false});
 app.post("/api/ad-bookings/upload",bookingUploadLimiter,upload.single("file"),async(req,res,next)=>{try{if(!req.file)return res.status(400).json({message:"File required"});if(!req.file.mimetype.startsWith("image/")&&!req.file.mimetype.startsWith("video/"))return res.status(400).json({message:"केवल image या video upload करें"});const folder=req.file.mimetype.startsWith("video/")?"ad-bookings/videos":"ad-bookings/images";const stored=await storeUploadedFile(req.file,folder);res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,storage:stored.storage});}catch(e){next(e)}});
