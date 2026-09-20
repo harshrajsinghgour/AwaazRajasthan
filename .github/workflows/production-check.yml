@@ -109,6 +109,7 @@ jobs:
           grep -n 'api/sitemap.xml' server.production.js
           ! grep -R -nE 'sk_(live|test)_[A-Za-z0-9]+|rzp_(live|test)_[A-Za-z0-9]+' server.production.js frontend/public/admin frontend/src || (echo 'Hard-coded payment secret detected' && exit 1)
           grep -n 'app.post("/api/admin/logout",optionalAuth' server.production.js
+          grep -q 'if(req.admin){req.admin.sessionVersion' server.production.js
           grep -n 'async function optionalAuth' server.production.js
           grep -n 'app.get("/api/admin/dashboard",auth' server.production.js
           grep -n 'app.get("/api/admin/news",auth' server.production.js
