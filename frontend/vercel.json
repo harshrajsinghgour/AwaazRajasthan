@@ -4,6 +4,7 @@
   "rewrites": [
     { "source": "/admin", "destination": "/admin/index.html" },
     { "source": "/admin/", "destination": "/admin/index.html" },
+    { "source": "/sitemap.xml", "destination": "https://awaazrajasthan.onrender.com/api/sitemap.xml" },
     { "source": "/news/:id*", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
