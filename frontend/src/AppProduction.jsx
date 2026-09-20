@@ -223,7 +223,18 @@ export default function AppProduction() {
   const [news, setNews] = useState(FALLBACK), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false);
   const [saved, setSaved] = useState(() => { try { return readStorageJson("awaaz-bookmarks", []); } catch { return []; } }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).filter(x => x && typeof x === "object" && x.id)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
   const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null);
-  useEffect(() => {\n    let cancelled = false;\n    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })\n      .then(r => r.ok ? r.json() : Promise.reject())\n      .then(data => {\n        const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];\n        if (!cancelled && names.length) setCategories(["होम", ...names.filter(x => x !== "होम" && x !== "सभी जिले"), "सभी जिले"]);\n      })\n      .catch(() => {});\n    return () => { cancelled = true; };\n  }, []);\n  const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => {
+        const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
+        if (!cancelled && names.length) setCategories(["होम", ...names.filter(x => x !== "होम" && x !== "सभी जिले"), "सभी जिले"]);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
   useEffect(() => {
     if (vapidPublicKey || !API_BASE) return;
     let cancelled = false;
