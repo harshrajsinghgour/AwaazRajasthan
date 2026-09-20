@@ -17,6 +17,9 @@ class FrontendErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     console.error("Awaaz Rajasthan frontend runtime error:", error, info);
+    try {
+      sessionStorage.setItem("awaaz-last-runtime-error", JSON.stringify({ message: String(error?.message || error || "Unknown error"), at: new Date().toISOString() }));
+    } catch {}
   }
 
   render() {
