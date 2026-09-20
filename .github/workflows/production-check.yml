@@ -99,7 +99,7 @@ jobs:
           grep -n 'Razorpay webhook is not configured' server.production.js
           grep -n 'timingSafeEqual' server.production.js
           grep -n 'watermarkEpaper' server.production.js
-          grep -n 'FRONTEND_URL.*api/sitemap' server.production.js
+          grep -n 'api/sitemap.xml' server.production.js
           ! grep -R -nE 'sk_(live|test)_[A-Za-z0-9]+|rzp_(live|test)_[A-Za-z0-9]+' server.production.js frontend/public/admin frontend/src || (echo 'Hard-coded payment secret detected' && exit 1)
 
 
