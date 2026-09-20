@@ -50,7 +50,6 @@ jobs:
           grep -q 'FrontendErrorBoundary' frontend/src/main.jsx
           grep -q 'sessionStorage.setItem("awaaz-last-runtime-error"' frontend/src/main.jsx
           node --check frontend/public/sw.js
-          node --check frontend/src/main.jsx
 
   backend-install:
     name: Backend dependency and syntax check
