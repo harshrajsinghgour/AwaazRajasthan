@@ -241,6 +241,24 @@ export default function AppProduction() {
   }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
   const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null);
   useEffect(() => {
+    const section = new URLSearchParams(window.location.search).get("section");
+    if (!section) return;
+    if (section === "saved") {
+      setSavedOnly(true);
+      setCategory("होम");
+      setDistrict("");
+      setSearchOpen(false);
+    } else if (section === "search") {
+      setSearchOpen(true);
+    } else if (section === "latest") {
+      setSavedOnly(false);
+      setCategory("होम");
+      setDistrict("");
+      window.setTimeout(() => document.getElementById("main-content")?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    }
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
