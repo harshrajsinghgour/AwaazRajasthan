@@ -83,6 +83,7 @@
       if(!d.admin)throw new Error("Login response invalid है।");
       status.className="login-status success";status.textContent="Login सफल — Admin Panel खुल रहा है…";
       sessionStorage.setItem("awaaz_admin_token",d.token||"");
+      me=d.admin;
       document.getElementById("login")?.classList.add("hidden");
       document.getElementById("panel")?.classList.remove("hidden");
       if(typeof window.loadAll==="function"){try{await window.loadAll();}catch(_){}}
