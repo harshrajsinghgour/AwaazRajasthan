@@ -226,7 +226,7 @@ async function verifyB2Storage(){
 
 async function auth(req,res,next){
  try{
-  const cookieToken=req.cookies.__Host_awaaz_admin||req.cookies.awaaz_admin||"";
+  const cookieToken=req.cookies.__Host-awaaz_admin||req.cookies.awaaz_admin||"";
   const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   const token=cookieToken||bearer;
   if(!token)return res.status(401).json({message:"Authentication required"});
@@ -243,7 +243,7 @@ async function auth(req,res,next){
 }
 async function optionalAuth(req,_res,next){
  try{
-  const cookieToken=req.cookies.__Host_awaaz_admin||req.cookies.awaaz_admin||"";
+  const cookieToken=req.cookies.__Host-awaaz_admin||req.cookies.awaaz_admin||"";
   const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   const token=cookieToken||bearer;
   if(token){
@@ -255,12 +255,12 @@ async function optionalAuth(req,_res,next){
 }
 function setCookie(res,t){
  const secure=process.env.COOKIE_SECURE!=="false";
- res.cookie("__Host_awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:ADMIN_COOKIE_MAX_AGE,path:"/"});
+ res.cookie("__Host-awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:ADMIN_COOKIE_MAX_AGE,path:"/"});
 }
 function clearCookie(res){
  const secure=process.env.COOKIE_SECURE!=="false";
  const opts={httpOnly:true,secure,sameSite:secure?"none":"lax",path:"/"};
- res.clearCookie("__Host_awaaz_admin",opts);
+ res.clearCookie("__Host-awaaz_admin",opts);
  res.clearCookie("awaaz_admin",opts);
 }
 app.get("/",(_r,res)=>res.json({ok:true,service:"awaaz-rajasthan-api",message:"Awaaz Rajasthan API is live"}));
