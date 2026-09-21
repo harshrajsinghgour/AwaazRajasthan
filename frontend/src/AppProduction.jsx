@@ -1,7 +1,8 @@
 // Production build stabilization
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "https://awaazrajasthan.onrender.com").replace(/\/$/, "");
+const DIRECT_API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "https://awaazrajasthan.onrender.com").replace(/\/$/, "");
+const API_BASE = import.meta.env.PROD ? "" : DIRECT_API_BASE;
 const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
 const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 
@@ -49,8 +50,8 @@ function mediaUrl(src) {
   const value = src.trim();
   if (/^(data:|blob:)/i.test(value)) return value;
   if (/^https?:\/\//i.test(value)) return value;
-  if (value === "/news-placeholder.svg" || value.startsWith("/assets/") || value.startsWith("/awaazrajasthan-logo")) return value;
-  try { return new URL(value, `${API_BASE}/`).href; } catch { return value; }
+  if (value.startsWith("/")) return value;
+  try { return new URL(value, `${API_BASE || window.location.origin}/`).href; } catch { return value; }
 }
 function safeImage(src) { return mediaUrl(src) || "/news-placeholder.svg"; }
 function readStorage(key, fallback = null) { try { return window.localStorage.getItem(key) ?? fallback; } catch { return fallback; } }
