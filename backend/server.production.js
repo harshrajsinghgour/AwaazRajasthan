@@ -169,12 +169,14 @@ const ADMIN_COOKIE_MAX_AGE=30*24*60*60*1000;
 const sign=a=>jwt.sign({sub:String(a._id),role:a.role,email:a.email,sv:a.sessionVersion||0},JWT_SECRET||"development-secret",{expiresIn:ADMIN_SESSION_TTL});
 async function verifyAdminPassword(admin,password){
  if(!admin||typeof password!=="string"||!password)return false;
- const stored=String(admin.passwordHash||"");
- try{
-  if(/^\$2[aby]\$\d{2}\$/.test(stored)) return await bcrypt.compare(password,stored);
- }catch{}
- // Migrate legacy plaintext passwords created by older admin builds.
- if(stored&&stored===password){
+ const stored=String(admin.passwordHash||"").trim();
+ if(!stored)return false;
+ // All Owner/Admin accounts use the same password verification path.
+ // Accept bcrypt hashes from every admin record and transparently migrate only legacy plaintext records.
+ if(/^\$2[aby]\$\d{2}\$/.test(stored)){
+  try{return await bcrypt.compare(password,stored);}catch{return false;}
+ }
+ if(stored===password){
   admin.passwordHash=await bcrypt.hash(password,12);
   await admin.save();
   return true;
@@ -263,7 +265,7 @@ app.get("/api/ads",async(req,res,next)=>{try{const device=AD_DEVICES.includes(St
 app.post("/api/ads/:id/impression",adImpressionLimiter,async(req,res,next)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:"Invalid ad id"});const ad=await Ad.findById(req.params.id).select("status startDate endDate").lean();if(!ad||!activeAd(ad))return res.status(404).json({message:"Ad not active"});await Ad.updateOne({_id:req.params.id},{$inc:{impressions:1}});res.status(204).end();}catch(e){next(e);}});
 app.post("/api/ads/:id/click",adClickLimiter,async(req,res,next)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:"Invalid ad id"});const ad=await Ad.findById(req.params.id).select("status startDate endDate").lean();if(!ad||!activeAd(ad))return res.status(404).json({message:"Ad not active"});await Ad.updateOne({_id:req.params.id},{$inc:{clicks:1}});res.status(204).end();}catch(e){next(e);}});
 app.post("/api/notifications/subscribe",subscriptionLimiter,async(req,res,next)=>{try{const body=req.body||{},endpoint=String(body.endpoint||"").trim();if(!endpoint||endpoint.length>2048||!isHttpsUrl(endpoint))return res.status(400).json({message:"Invalid subscription endpoint"});if(!body.keys||typeof body.keys!=="object"||Array.isArray(body.keys))return res.status(400).json({message:"Push subscription keys are required"});const p256dh=String(body.keys.p256dh||"").trim(),authKey=String(body.keys.auth||"").trim();if(!p256dh||p256dh.length>512||!authKey||authKey.length>512)return res.status(400).json({message:"Invalid push subscription keys"});if(body.expirationTime!==undefined&&body.expirationTime!==null&&(!Number.isFinite(Number(body.expirationTime))||Number(body.expirationTime)<0))return res.status(400).json({message:"Invalid subscription expiration"});await Subscriber.findOneAndUpdate({endpoint},{subscription:{...body,endpoint,keys:{p256dh,auth:authKey}},active:true},{upsert:true,new:true,setDefaultsOnInsert:true});res.status(201).json({ok:true});}catch(e){next(e);}});
-app.post("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{try{const email=String(req.body.email||"").toLowerCase().trim(),password=String(req.body.password||"");if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});const a=await Admin.findOne({email});let passwordOk=await verifyAdminPassword(a,password);if(!passwordOk&&a?.role==="owner"&&process.env.OWNER_PASSWORD&&password===String(process.env.OWNER_PASSWORD)){a.passwordHash=await bcrypt.hash(password,12);a.sessionVersion=Number(a.sessionVersion||0)+1;passwordOk=true;console.log("OWNER_PASSWORD_RECOVERY_SYNCED");}if(!a||!a.active||!passwordOk){console.warn("ADMIN_LOGIN_FAILED",JSON.stringify({email,exists:!!a,active:a?.active===true,hashPresent:!!a?.passwordHash,hashType:a?.passwordHash?String(a.passwordHash).slice(0,4):null}));return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});}a.lastLoginAt=new Date();await a.save();const token=sign(a);setCookie(res,token);res.json({admin:safe(a),token});}catch(e){next(e);}});
+app.post("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{try{const email=String(req.body.email||"").toLowerCase().trim(),password=String(req.body.password||"");if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});const a=await Admin.findOne({email});const passwordOk=await verifyAdminPassword(a,password);if(!a||!a.active||!passwordOk){console.warn("ADMIN_LOGIN_FAILED",JSON.stringify({email,exists:!!a,active:a?.active===true,hashPresent:!!a?.passwordHash,hashType:a?.passwordHash?String(a.passwordHash).slice(0,4):null}));return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});}a.lastLoginAt=new Date();await a.save();const token=sign(a);setCookie(res,token);res.json({admin:safe(a),token});}catch(e){next(e);}});
 app.post("/api/admin/logout",optionalAuth,async(req,res,next)=>{try{if(req.admin){req.admin.sessionVersion=Number(req.admin.sessionVersion||0)+1;await req.admin.save();}clearCookie(res);res.json({ok:true});}catch(e){next(e);}});
 app.get("/api/admin/me",auth,(req,res)=>res.json({admin:safe(req.admin)}));
 app.get("/api/admin/profile",auth,(req,res)=>res.json({admin:safe(req.admin)}));
