@@ -226,7 +226,7 @@ async function verifyB2Storage(){
 
 async function auth(req,res,next){
  try{
-  const cookieToken=req.cookies.__Host-awaaz_admin||req.cookies.awaaz_admin||"";
+  const cookieToken=req.cookies["__Host-awaaz_admin"]||req.cookies.awaaz_admin||"";
   const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   const token=cookieToken||bearer;
   if(!token)return res.status(401).json({message:"Authentication required"});
@@ -243,7 +243,7 @@ async function auth(req,res,next){
 }
 async function optionalAuth(req,_res,next){
  try{
-  const cookieToken=req.cookies.__Host-awaaz_admin||req.cookies.awaaz_admin||"";
+  const cookieToken=req.cookies["__Host-awaaz_admin"]||req.cookies.awaaz_admin||"";
   const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
   const token=cookieToken||bearer;
   if(token){
