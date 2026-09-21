@@ -62,7 +62,7 @@
 </main>
 </section>
 </div>
-<script src="/admin/admin.js?v=20260921-login13"></script>
+<script src="/admin/admin.js?v=20260921-login14"></script>
 <script>
 (function(){
   const runLogin=async function(e){
@@ -83,7 +83,11 @@
       if(!d.admin)throw new Error("Login response invalid है।");
       status.className="login-status success";status.textContent="Login सफल — Admin Panel खुल रहा है…";
       sessionStorage.setItem("awaaz_admin_token",d.token||"");
-      location.replace("/admin/?loggedin=1&t="+Date.now());
+      document.getElementById("login")?.classList.add("hidden");
+      document.getElementById("panel")?.classList.remove("hidden");
+      if(typeof window.loadAll==="function"){try{await window.loadAll();}catch(_){}}
+      status.className="login-status success";
+      status.textContent="Admin Panel खुल गया है ✓";
     }catch(err){
       status.className="login-status error";
       status.textContent=err.message||"Login failed";
