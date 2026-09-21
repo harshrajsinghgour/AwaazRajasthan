@@ -5,10 +5,10 @@ const API_BASE = (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_U
 const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
 const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 
-const DEFAULT_CATEGORIES = ["होम", "राजस्थान", "जयपुर", "जोधपुर", "उदयपुर", "कोटा", "अजमेर", "भीलवाड़ा", "सभी जिले", "अपराध", "राजनीति", "शिक्षा", "नौकरी", "खेल", "देश", "दुनिया", "मनोरंजन", "बिजनेस"];\nconst DEFAULT_HOME_BUTTONS = [{label:"ताज़ा खबरें",icon:"🕒",action:"latest"},{label:"ब्रेकिंग न्यूज़",icon:"🔴",action:"breaking"},{label:"ट्रेंडिंग",icon:"🔥",action:"trending"},{label:"वीडियो",icon:"▶️",action:"video"},{label:"फोटो",icon:"📷",action:"photo"}];
+const DEFAULT_CATEGORIES = ["होम", "भारत", "विश्व", "राजस्थान", "जयपुर", "जोधपुर", "उदयपुर", "कोटा", "अजमेर", "भीलवाड़ा", "सभी जिले", "अपराध", "राजनीति", "शिक्षा", "नौकरी", "खेल", "मनोरंजन", "बिजनेस"];\nconst DEFAULT_HOME_BUTTONS = [{label:"ताज़ा खबरें",icon:"🕒",action:"latest"},{label:"ब्रेकिंग न्यूज़",icon:"🔴",action:"breaking"},{label:"ट्रेंडिंग",icon:"🔥",action:"trending"},{label:"वीडियो",icon:"▶️",action:"video"},{label:"फोटो",icon:"📷",action:"photo"}];
 const DISTRICTS = ["अजमेर", "अलवर", "बालोतरा", "बांसवाड़ा", "बारां", "बाड़मेर", "ब्यावर", "भरतपुर", "भीलवाड़ा", "बीकानेर", "बूंदी", "चित्तौड़गढ़", "चूरू", "दौसा", "डीग", "धौलपुर", "डीडवाना-कुचामन", "डूंगरपुर", "हनुमानगढ़", "जयपुर", "जैसलमेर", "जालौर", "झालावाड़", "झुंझुनूं", "जोधपुर", "करौली", "खैरथल-तिजारा", "कोटा", "कोटपूतली-बहरोड़", "नागौर", "पाली", "फलोदी", "प्रतापगढ़", "राजसमंद", "सलूम्बर", "सवाई माधोपुर", "सीकर", "सिरोही", "श्रीगंगानगर", "टोंक", "उदयपुर"];
 
-const FALLBACK = [
+const FALLBACK = [\n  { id: "f0", category: "भारत", title: "भारत की मुख्य खबरें और राष्ट्रीय अपडेट्स", excerpt: "देशभर से प्रमुख और महत्वपूर्ण राष्ट्रीय खबरें।", image: "/news-placeholder.svg", time: "अभी", location: "भारत" },\n  { id: "f00", category: "विश्व", title: "विश्व की मुख्य खबरें और अंतरराष्ट्रीय अपडेट्स", excerpt: "दुनिया भर से महत्वपूर्ण अंतरराष्ट्रीय खबरें।", image: "/news-placeholder.svg", time: "अभी", location: "विश्व" },
   { id: "f1", category: "राजस्थान", title: "राजस्थान की बड़ी खबरें और दिनभर के महत्वपूर्ण अपडेट्स", excerpt: "प्रदेश के अलग-अलग जिलों से सामने आई प्रमुख खबरें और जनहित से जुड़ी जानकारी एक जगह।", image: "/news-placeholder.svg", time: "अभी", location: "राजस्थान" },
   { id: "f2", category: "जयपुर", title: "जयपुर से जुड़ी महत्वपूर्ण खबर और शहर के नए अपडेट", excerpt: "शहर की नागरिक सुविधाओं और प्रमुख गतिविधियों से जुड़े ताजा अपडेट।", image: "/news-placeholder.svg", time: "10 मिनट पहले", location: "जयपुर" },
   { id: "f3", category: "खेल", title: "खेल जगत की प्रमुख खबरें और आज के अहम अपडेट", excerpt: "प्रतियोगिताओं और खेल जगत से जुड़ी महत्वपूर्ण जानकारी।", image: "/news-placeholder.svg", time: "25 मिनट पहले", location: "राजस्थान" },
@@ -16,7 +16,7 @@ const FALLBACK = [
   { id: "f5", category: "अपराध", title: "पुलिस और प्रशासन से जुड़े महत्वपूर्ण अपडेट", excerpt: "स्थानीय घटनाओं और आधिकारिक अपडेट का संक्षिप्त विवरण।", image: "/news-placeholder.svg", time: "1 घंटा पहले", location: "राजस्थान" }
 ];
 
-const CATEGORY_ICONS = { राजस्थान: "🏜️", जयपुर: "🏛️", जोधपुर: "🏰", उदयपुर: "🌊", कोटा: "🎓", अजमेर: "🕌", भीलवाड़ा: "🏭", बीकानेर: "🐪", अलवर: "🌳", अपराध: "🚨", राजनीति: "🏛️", शिक्षा: "📚", नौकरी: "💼", खेल: "🏆", देश: "🇮🇳", दुनिया: "🌍", मनोरंजन: "🎬", बिजनेस: "📈" };
+const CATEGORY_ICONS = { भारत: "🇮🇳", विश्व: "🌍", राजस्थान: "🏜️", जयपुर: "🏛️", जोधपुर: "🏰", उदयपुर: "🌊", कोटा: "🎓", अजमेर: "🕌", भीलवाड़ा: "🏭", बीकानेर: "🐪", अलवर: "🌳", अपराध: "🚨", राजनीति: "🏛️", शिक्षा: "📚", नौकरी: "💼", खेल: "🏆", देश: "🇮🇳", दुनिया: "🌍", मनोरंजन: "🎬", बिजनेस: "📈" };
 
 function normalizeSavedItem(item) {
   if (!item || typeof item !== "object") return null;
@@ -265,11 +265,13 @@ export default function AppProduction() {
       .then(data => {
         const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
         if (!cancelled && names.length) {
-          const ordered = names.filter(x => x !== "होम" && x !== "सभी जिले");
-          const bhilwaraIndex = ordered.indexOf("भीलवाड़ा");
-          const insertAt = bhilwaraIndex >= 0 ? bhilwaraIndex + 1 : ordered.length;
-          ordered.splice(insertAt, 0, "सभी जिले");
-          setCategories(["होम", ...ordered]);
+          const ordered = names.filter(x => !["होम","सभी जिले","देश","दुनिया"].includes(x));
+          const desired = ["भारत","विश्व","राजस्थान"];
+          const rest = ordered.filter(x => !desired.includes(x));
+          const bhilwaraIndex = rest.indexOf("भीलवाड़ा");
+          const insertAt = bhilwaraIndex >= 0 ? bhilwaraIndex + 1 : rest.length;
+          rest.splice(insertAt, 0, "सभी जिले");
+          setCategories(["होम", ...desired, ...rest]);
         }
       })
       .catch(() => {});
