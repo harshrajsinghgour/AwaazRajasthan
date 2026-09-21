@@ -62,40 +62,6 @@
 </main>
 </section>
 </div>
-<script src="/admin/admin.js?v=20260921-login9"></script><script>
-window.awaazAdminLogin=async function(){
-  const email=(document.getElementById("email")?.value||"").trim().toLowerCase();
-  const password=document.getElementById("password")?.value||"";
-  const status=document.getElementById("loginStatus");
-  const error=document.getElementById("loginError");
-  const btn=document.getElementById("loginSubmit");
-  if(!status||!btn)return;
-  error.textContent="";
-  status.className="login-status loading";
-  status.textContent="Login हो रहा है…";
-  if(!email||!password){status.className="login-status error";status.textContent="Email और Password दोनों भरें।";return;}
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){status.className="login-status error";status.textContent="सही email address डालें।";return;}
-  btn.disabled=true; btn.textContent="Login हो रहा है…";
-  try{
-    const r=await fetch("/api/admin/login",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({email,password})});
-    let d={}; try{d=await r.json()}catch{}
-    if(!r.ok)throw new Error(d.message||"Login failed");
-    if(!d.admin)throw new Error("Login response invalid है।");
-    status.className="login-status success";
-    status.textContent="Login सफल — Admin Panel खुल रहा है…";
-    document.getElementById("login").classList.add("hidden");
-    document.getElementById("panel").classList.remove("hidden");
-    if(window.loadAll) { window.me=d.admin; await window.loadAll(); }
-    else { location.reload(); }
-  }catch(e){
-    status.className="login-status error";
-    status.textContent=e.message||"Login failed";
-  }finally{
-    btn.disabled=false; btn.textContent="↪ Login";
-  }
-};
-document.getElementById("loginSubmit")?.addEventListener("click",window.awaazAdminLogin);
-document.getElementById("loginForm")?.addEventListener("submit",e=>{e.preventDefault();window.awaazAdminLogin();});
-</script>
+<script src="/admin/admin.js?v=20260921-login10"></script>
 </body>
 </html>
