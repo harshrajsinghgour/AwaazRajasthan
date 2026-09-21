@@ -335,7 +335,7 @@ app.post("/api/admin/password/reset-otp",rateLimit({windowMs:15*60*1000,limit:10
 app.post("/api/admin/admin-password/request-otp",auth,ownerOnly,async(req,res,next)=>{
  try{
   const target=await Admin.findById(req.body?.adminId);
-  if(!target||target.role==="owner")return res.status(404).json({message:"Admin not found"});
+  if(!target||target.ownerType==="primary")return res.status(404).json({message:"Admin not found"});
   await issueAdminOtp(target);
   res.json({ok:true,message:"OTP sent to registered admin email"});
  }catch(e){next(e);}
@@ -346,7 +346,7 @@ app.post("/api/admin/admin-password/reset-otp",auth,ownerOnly,async(req,res,next
   if(!/^\d{6}$/.test(otp))return res.status(400).json({message:"Invalid OTP"});
   if(nextPassword.length<10)return res.status(400).json({message:"New password must be at least 10 characters"});
   const target=await Admin.findById(adminId);
-  if(!target||target.role==="owner")return res.status(404).json({message:"Admin not found"});
+  if(!target||target.ownerType==="primary")return res.status(404).json({message:"Admin not found"});
   const result=await resetAdminWithOtp(target,otp,nextPassword);
   if(result.ok)return res.json({ok:true});
   return res.status(result.status).json({message:result.message});
