@@ -29,7 +29,7 @@ async function api(path,options={}){
    if(r.status===401){clearLegacyAdminToken();throw new Error(d.message||"Session expired. कृपया फिर login करें।");}
    if(r.status===429)throw new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");
    if(r.status===502||r.status===503||r.status===504)throw new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");
-   throw new Error(d.message||`Request failed (${r.status})`);
+   throw new Error(d.message||`Server request failed (${r.status}). कृपया कुछ सेकंड बाद फिर प्रयास करें।`);
   }
   return d;
  }catch(error){
