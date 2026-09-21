@@ -62,10 +62,32 @@
 </main>
 </section>
 </div>
-<script src="/admin/admin.js?v=20260921-login11"></script>
+<script id="adminAppScript" src="/admin/admin.js?v=20260921-login12"></script>
 <script>
 (function(){
   var form=document.getElementById("loginForm");
+  var appScript=document.getElementById("adminAppScript");
+  function waitForAdminApp(){
+    if(typeof window.awaazAdminCompleteLogin==="function")return Promise.resolve(true);
+    if(window.__awaazAdminLoadPromise)return window.__awaazAdminLoadPromise;
+    window.__awaazAdminLoadPromise=new Promise(function(resolve,reject){
+      var done=false;
+      function finish(ok){if(done)return;done=true;ok?resolve(true):reject(new Error("Admin application load नहीं हुआ।"));}
+      if(appScript){
+        appScript.addEventListener("load",function(){setTimeout(function(){finish(typeof window.awaazAdminCompleteLogin==="function");},0);},{once:true});
+        appScript.addEventListener("error",function(){finish(false);},{once:true});
+      }
+      if(typeof window.awaazAdminCompleteLogin!=="function"){
+        var s=document.createElement("script");
+        s.src="/admin/admin.js?v=20260921-login12-retry";
+        s.async=false;
+        s.onload=function(){setTimeout(function(){finish(typeof window.awaazAdminCompleteLogin==="function");},0);};
+        s.onerror=function(){finish(false);};
+        document.body.appendChild(s);
+      }else finish(true);
+    });
+    return window.__awaazAdminLoadPromise;
+  }
   if(!form)return;
   setTimeout(function(){
     if(typeof window.awaazAdminCompleteLogin==="function")return;
@@ -85,8 +107,8 @@
         var d={};try{d=await r.json();}catch(_){}
         if(!r.ok)throw new Error(d.message||"ईमेल या पासवर्ड गलत है।");
         window.__awaazAdminToken=d.token||"";
-        if(typeof window.awaazAdminCompleteLogin==="function")await window.awaazAdminCompleteLogin(d.admin,d.token);
-        else throw new Error("Admin application load नहीं हुआ। Page refresh करके फिर login करें।");
+        await waitForAdminApp();
+        await window.awaazAdminCompleteLogin(d.admin,d.token);
       }catch(err){
         if(status){status.className="login-status error";status.textContent=err.message||"Login failed";}
       }finally{if(btn)btn.disabled=false;}
