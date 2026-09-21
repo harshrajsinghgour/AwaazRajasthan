@@ -89,8 +89,17 @@ const handleLogin=async e=>{
  status.textContent="Login हो रहा है…";
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
  try{
-  const r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
-  if(!r?.ok||!r?.admin)throw new Error("Login response invalid है।");
+  let r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
+  const responseAdmin=r?.admin||r?.data?.admin||null;
+  if(responseAdmin){
+   r={...r,admin:responseAdmin};
+  }else{
+   try{
+    const session=await api("/api/admin/me");
+    if(session?.admin)r={...r,ok:true,admin:session.admin};
+   }catch{}
+  }
+  if(!r?.admin)throw new Error("Login response invalid है। Server ने valid admin session नहीं लौटाया।");
   me=r.admin;
   showPanel();
   status.className="login-status success";
