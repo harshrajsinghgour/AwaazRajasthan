@@ -258,6 +258,42 @@ app.post("/api/notifications/subscribe",subscriptionLimiter,async(req,res,next)=
 app.post("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{try{const email=String(req.body.email||"").toLowerCase().trim(),password=String(req.body.password||"");if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});const a=await Admin.findOne({email});if(!a||!a.active||!(await verifyAdminPassword(a,password))){console.warn("ADMIN_LOGIN_FAILED",JSON.stringify({email,exists:!!a,active:a?.active===true,hashPresent:!!a?.passwordHash,hashType:a?.passwordHash?String(a.passwordHash).slice(0,4):null}));return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});}a.lastLoginAt=new Date();await a.save();setCookie(res,sign(a));res.json({admin:safe(a),token:sign(a)});}catch(e){next(e);}});
 app.post("/api/admin/logout",optionalAuth,async(req,res,next)=>{try{if(req.admin){req.admin.sessionVersion=Number(req.admin.sessionVersion||0)+1;await req.admin.save();}clearCookie(res);res.json({ok:true});}catch(e){next(e);}});
 app.get("/api/admin/me",auth,(req,res)=>res.json({admin:safe(req.admin)}));
+app.get("/api/admin/profile",auth,(req,res)=>res.json({admin:safe(req.admin)}));
+app.patch("/api/admin/profile",auth,async(req,res,next)=>{
+ try{
+  const keys=Object.keys(req.body||{}),allowed=new Set(["email","password","avatar"]);
+  if(keys.some(k=>!allowed.has(k)))return res.status(400).json({message:"Profile में केवल email, password और profile photo बदली जा सकती है।"});
+  const u={};let invalidate=false;
+  if(req.body?.email!==undefined){
+   const email=String(req.body.email||"").toLowerCase().trim();
+   if(!isValidEmail(email))return res.status(400).json({message:"Valid email required"});
+   const clash=await Admin.findOne({email,_id:{$ne:req.admin._id}}).select("_id").lean();
+   if(clash)return res.status(409).json({message:"Email is already in use"});
+   u.email=email;invalidate=true;
+  }
+  if(req.body?.avatar!==undefined){
+   const avatar=String(req.body.avatar||"").trim().slice(0,600);
+   if(avatar&&!isHttpUrl(avatar))return res.status(400).json({message:"Invalid profile photo URL"});
+   u.avatar=avatar;
+  }
+  if(req.body?.password!==undefined&&String(req.body.password||"")){
+   const password=String(req.body.password);
+   if(password.length<10)return res.status(400).json({message:"Password must be at least 10 characters"});
+   u.passwordHash=await bcrypt.hash(password,12);invalidate=true;
+  }
+  if(invalidate)u.$inc={sessionVersion:1};
+  const admin=await Admin.findByIdAndUpdate(req.admin._id,u,{new:true,runValidators:true});
+  res.json({admin:safe(admin),reauthRequired:invalidate});
+ }catch(e){next(e)}
+});
+app.post("/api/admin/profile/upload",auth,upload.single("file"),async(req,res,next)=>{
+ try{
+  if(!req.file)return res.status(400).json({message:"File required"});
+  if(!/^image\/(jpeg|png|webp|gif)$/.test(req.file.mimetype))return res.status(400).json({message:"केवल JPG, PNG, WEBP या GIF photo स्वीकार है"});
+  const stored=await storeUploadedFile(req.file,"admin-profiles");
+  res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,storage:stored.storage});
+ }catch(e){next(e)}
+});
 const issueAdminOtp=async(target)=>{
  const otp=String(crypto.randomInt(100000,1000000));
  await sendAdminOtpEmail(target.email,target.name,otp);
