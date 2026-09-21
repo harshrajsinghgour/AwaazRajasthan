@@ -10,7 +10,7 @@ function fillAssignmentSelects(selectedCategories=[],selectedDistricts=[]){
 }
 function selectedAssignmentValues(id){return [...($(id)?.selectedOptions||[])].map(o=>o.value);}
 let me=null,news=[],ads=[],admins=[];
-const DEFAULT_API_BASE="https://awaazrajasthan.onrender.com";
+const DEFAULT_API_BASE="";
 function getApiBase(){return DEFAULT_API_BASE;}
 function setApiBase(){return getApiBase();}
 function initApiBase(){}
