@@ -63,3 +63,34 @@
 </section>
 </div>
 <script src="/admin/admin.js?v=20260921-login8"></script>
+<script>
+(function(){
+  var form=document.getElementById("loginForm");
+  if(!form)return;
+  setTimeout(function(){
+    if(typeof window.awaazAdminCompleteLogin==="function")return;
+    if(form.dataset.fallbackBound==="1")return;
+    form.dataset.fallbackBound="1";
+    form.addEventListener("submit",async function(e){
+      e.preventDefault();
+      var email=(document.getElementById("email")||{}).value||"";
+      var password=(document.getElementById("password")||{}).value||"";
+      var status=document.getElementById("loginStatus"),btn=document.getElementById("loginSubmit");
+      email=email.trim().toLowerCase();
+      if(!email||!password){if(status)status.textContent="Email और Password दोनों भरें।";return;}
+      if(btn)btn.disabled=true;
+      if(status){status.className="login-status loading";status.textContent="Login हो रहा है…";}
+      try{
+        var r=await fetch("/api/admin/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})});
+        var d={};try{d=await r.json();}catch(_){}
+        if(!r.ok)throw new Error(d.message||"ईमेल या पासवर्ड गलत है।");
+        window.__awaazAdminToken=d.token||"";
+        if(typeof window.awaazAdminCompleteLogin==="function")await window.awaazAdminCompleteLogin(d.admin,d.token);
+        else throw new Error("Admin application load नहीं हुआ। Page refresh करके फिर login करें।");
+      }catch(err){
+        if(status){status.className="login-status error";status.textContent=err.message||"Login failed";}
+      }finally{if(btn)btn.disabled=false;}
+    });
+  },1200);
+})();
+</script>
