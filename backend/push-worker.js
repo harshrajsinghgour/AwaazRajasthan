@@ -15,8 +15,8 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) throw new Error("
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-const newsSchema = new mongoose.Schema({ title: String, slug: String, excerpt: String, category: String, location: String, image: String, status: String, breaking: Boolean, publishedAt: Date }, { collection: "news", timestamps: true });
-const subscriberSchema = new mongoose.Schema({ endpoint: { type: String, unique: true }, subscription: mongoose.Schema.Types.Mixed, active: Boolean }, { collection: "subscribers", timestamps: true });
+const newsSchema = new mongoose.Schema({ title: String, slug: String, excerpt: String, category: String, location: String, image: String, status: String, breaking: Boolean, publishedAt: Date, pushNotifiedAt: Date }, { collection: "news", timestamps: true });
+const subscriberSchema = new mongoose.Schema({ endpoint: { type: String, unique: true }, subscription: mongoose.Schema.Types.Mixed, active: Boolean, lastSuccessAt: Date, lastFailureAt: Date }, { collection: "subscribers", timestamps: true });
 const deliverySchema = new mongoose.Schema({
   newsId: { type: mongoose.Schema.Types.ObjectId, unique: true },
   claimToken: { type: String, default: "" },
@@ -90,10 +90,11 @@ async function markDelivered(newsId, claimToken, endpoint) {
 async function sendOne(row, payload) {
   try {
     await webpush.sendNotification(row.subscription, payload);
+    await Subscriber.updateOne({ _id: row._id }, { $set: { lastSuccessAt: new Date(), active: true } });
     return { endpoint: String(row.endpoint || ""), sent: 1, removed: 0, retry: 0 };
   } catch (error) {
     if (error?.statusCode === 404 || error?.statusCode === 410) {
-      await Subscriber.updateOne({ _id: row._id }, { $set: { active: false } });
+      await Subscriber.updateOne({ _id: row._id }, { $set: { active: false, lastFailureAt: new Date() } });
       return { endpoint: String(row.endpoint || ""), sent: 0, removed: 1, retry: 0 };
     }
     console.error("Push delivery failed:", error?.statusCode || error?.message || error);
@@ -150,6 +151,7 @@ async function processBreakingNews() {
       }
       if (result.remaining === 0) {
         await markSent(news._id, claimToken);
+        await News.updateOne({ _id: news._id, pushNotifiedAt: null }, { $set: { pushNotifiedAt: new Date() } });
         console.log(`Push delivery complete for ${news._id}: sent=${result.sent}, removed=${result.removed}, retry=${result.retry}`);
       } else {
         await releaseClaim(news._id, claimToken);
