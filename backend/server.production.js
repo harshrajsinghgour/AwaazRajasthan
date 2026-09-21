@@ -161,7 +161,9 @@ async function sendAdminOtpEmail(to,name,otp){
  }
  throw new Error("Email service is not configured on Render"); 
 }
-const sign=a=>jwt.sign({sub:String(a._id),role:a.role,email:a.email,sv:a.sessionVersion||0},JWT_SECRET||"development-secret",{expiresIn:"8h"});
+const ADMIN_SESSION_TTL="30d";
+const ADMIN_COOKIE_MAX_AGE=30*24*60*60*1000;
+const sign=a=>jwt.sign({sub:String(a._id),role:a.role,email:a.email,sv:a.sessionVersion||0},JWT_SECRET||"development-secret",{expiresIn:ADMIN_SESSION_TTL});
 async function verifyAdminPassword(admin,password){
  if(!admin||typeof password!=="string"||!password)return false;
  const stored=String(admin.passwordHash||"");
@@ -219,7 +221,7 @@ async function verifyB2Storage(){
 
 async function auth(req,res,next){try{const token=req.cookies.awaaz_admin||String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");if(!token)return res.status(401).json({message:"Authentication required"});const p=jwt.verify(token,JWT_SECRET||"development-secret"),a=await Admin.findById(p.sub);if(!a||!a.active||Number(p.sv||0)!==Number(a.sessionVersion||0))return res.status(401).json({message:"Session expired"});req.admin=a;next();}catch{res.status(401).json({message:"Invalid or expired session"});}}
 async function optionalAuth(req,_res,next){try{const token=req.cookies.awaaz_admin||String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");if(token){const p=jwt.verify(token,JWT_SECRET||"development-secret"),a=await Admin.findById(p.sub);if(a&&a.active&&Number(p.sv||0)===Number(a.sessionVersion||0))req.admin=a;}}catch{}next();}
-function setCookie(res,t){const secure=process.env.COOKIE_SECURE!=="false";res.cookie("awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:8*60*60*1000,path:"/"});}
+function setCookie(res,t){const secure=process.env.COOKIE_SECURE!=="false";res.cookie("awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:ADMIN_COOKIE_MAX_AGE,path:"/"});}
 function clearCookie(res){const secure=process.env.COOKIE_SECURE!=="false";res.clearCookie("awaaz_admin",{httpOnly:true,secure,sameSite:secure?"none":"lax",path:"/"});}
 app.get("/",(_r,res)=>res.json({ok:true,service:"awaaz-rajasthan-api",message:"Awaaz Rajasthan API is live"}));
 app.get("/api/health",(_r,res)=>{const database=mongoose.connection.readyState===1?"connected":"disconnected";const ok=database==="connected";res.status(ok?200:503).json({ok,database,service:"awaaz-rajasthan-api",time:new Date().toISOString()});});
