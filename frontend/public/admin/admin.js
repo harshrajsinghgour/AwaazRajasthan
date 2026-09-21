@@ -11,7 +11,7 @@ function fillAssignmentSelects(selectedCategories=[],selectedDistricts=[]){
 function selectedAssignmentValues(id){return [...($(id)?.selectedOptions||[])].map(o=>o.value);}
 let me=null,news=[],ads=[],admins=[];
 const DEFAULT_API_BASE="https://awaazrajasthan.onrender.com";
-function getApiBase(){return /^(localhost|127\\.0\\.0\\.1)$/i.test(location.hostname)?DEFAULT_API_BASE:"";}
+function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?DEFAULT_API_BASE:"";}
 function setApiBase(){return getApiBase();}
 function initApiBase(){}
 async function api(path,options={}){const base=getApiBase();const opts={credentials:"include",...options};opts.headers={"Content-Type":"application/json",...(options.headers||{})};if(window.__awaazAdminToken)opts.headers.Authorization="Bearer "+window.__awaazAdminToken;const r=await fetch(base+path,opts);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Request failed");return d;}
