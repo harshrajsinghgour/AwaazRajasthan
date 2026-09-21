@@ -89,18 +89,22 @@ const handleLogin=async e=>{
  status.textContent="Login हो रहा है…";
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
  try{
-  let r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
-  const responseAdmin=r?.admin||r?.data?.admin||null;
-  if(responseAdmin){
-   r={...r,admin:responseAdmin};
-  }else{
-   try{
-    const session=await api("/api/admin/me");
-    if(session?.admin)r={...r,ok:true,admin:session.admin};
-   }catch{}
+  const loginResponse=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
+  // Login success is confirmed by the authenticated session endpoint, not by
+  // the shape of the login JSON. This prevents false "invalid response" errors
+  // when a proxy/CDN changes the response envelope.
+  let session;
+  try{
+   session=await api("/api/admin/me");
+  }catch(sessionError){
+   if(loginResponse?.admin){
+    session={admin:loginResponse.admin};
+   }else{
+    throw new Error("Login सफल हुआ, लेकिन secure session स्थापित नहीं हो पाई। कृपया फिर से Login करें।");
+   }
   }
-  if(!r?.admin)throw new Error("Login response invalid है। Server ने valid admin session नहीं लौटाया।");
-  me=r.admin;
+  if(!session?.admin)throw new Error("Login सफल हुआ, लेकिन admin session verify नहीं हो पाई।");
+  me=session.admin;
   showPanel();
   status.className="login-status success";
   status.textContent="Admin Panel खुल रहा है…";
