@@ -63,37 +63,3 @@
 </section>
 </div>
 <script src="/admin/admin.js?v=20260921-owner5"></script>
-<script>
-(function(){
-  const form=document.getElementById("loginForm");
-  if(!form)return;
-  form.onsubmit=async function(e){
-    e.preventDefault();
-    const email=document.getElementById("email").value.trim().toLowerCase();
-    const password=document.getElementById("password").value;
-    const status=document.getElementById("loginStatus");
-    const btn=document.getElementById("loginSubmit");
-    if(!email||!password){status.className="login-status error";status.textContent="Email और Password दोनों भरें।";return;}
-    btn.disabled=true;btn.textContent="Login हो रहा है…";status.className="login-status loading";status.textContent="Login हो रहा है…";
-    try{
-      const r=await fetch("https://awaazrajasthan.onrender.com/api/admin/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
-      let d={};try{d=await r.json()}catch(_){}
-      if(!r.ok)throw new Error(d.message||"Login failed");
-      if(!d.admin)throw new Error("Login response invalid है।");
-      window.__awaazAdminToken=d.token||"";
-      window.__awaazAdminUser=d.admin;
-      document.getElementById("login").classList.add("hidden");
-      document.getElementById("panel").classList.remove("hidden");
-      status.className="login-status success";status.textContent="Admin Panel खुल रहा है…";
-      if(typeof window.awaazAdminCompleteLogin==="function") await window.awaazAdminCompleteLogin(d.admin,d.token||"");
-    }catch(err){
-      status.className="login-status error";status.textContent=err.message||"Login failed";
-    }finally{
-      btn.disabled=false;btn.textContent="↪ Login";
-    }
-  };
-})();
-</script>
-
-</body>
-</html>
