@@ -283,7 +283,10 @@ app.patch("/api/admin/profile",auth,async(req,res,next)=>{
   }
   if(invalidate)u.$inc={sessionVersion:1};
   const admin=await Admin.findByIdAndUpdate(req.admin._id,u,{new:true,runValidators:true});
-  res.json({admin:safe(admin),reauthRequired:invalidate});
+  if(!admin)return res.status(404).json({message:"Admin profile not found"});
+  const token=sign(admin);
+  setCookie(res,token);
+  res.json({admin:safe(admin),token,reauthRequired:false});
  }catch(e){next(e)}
 });
 app.post("/api/admin/profile/upload",auth,upload.single("file"),async(req,res,next)=>{
