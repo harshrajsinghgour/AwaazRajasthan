@@ -292,7 +292,7 @@ export default function AppProduction() {
   }, []);
   const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
   useEffect(() => {
-    if (vapidPublicKey || !API_BASE) return;
+    if (vapidPublicKey) return;
     let cancelled = false;
     fetch(`${API_BASE}/api/notifications/public-key`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
@@ -373,7 +373,7 @@ export default function AppProduction() {
   async function enableNotifications() {
     if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotifyState("error"); setToast("इस डिवाइस पर पुश नोटिफिकेशन उपलब्ध नहीं है"); return; }
     if (!vapidPublicKey) { setNotifyState("error"); setToast("नोटिफिकेशन सेवा अभी कॉन्फ़िगर नहीं है"); return; }
-    if (!API_BASE) { setNotifyState("error"); setToast("नोटिफिकेशन सर्वर अभी कॉन्फ़िगर नहीं है"); return; }
+    
     setNotifyState("loading");
     try {
       if (Notification.permission === "denied") { setNotifyState("error"); setToast("Chrome में इस वेबसाइट के Notifications Block हैं। Site settings में जाकर Notifications → Allow करें, फिर पेज Reload करें।"); return; }
