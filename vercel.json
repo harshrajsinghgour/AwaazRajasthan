@@ -20,13 +20,13 @@
       "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!admin(?:/|$)).*)",
       "destination": "/index.html"
     }
   ],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/((?!admin(?:/|$)).*)",
       "headers": [
         {
           "key": "X-Content-Type-Options",
@@ -51,7 +51,7 @@
       ]
     },
     {
-      "source": "/assets/(.*)",
+      "source": "/assets/((?!admin(?:/|$)).*)",
       "headers": [
         {
           "key": "Cache-Control",
