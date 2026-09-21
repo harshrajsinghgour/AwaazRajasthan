@@ -63,44 +63,6 @@
 </section>
 </div>
 <script src="/admin/admin.js?v=20260921-login14"></script>
-<script>
-(function(){
-  const runLogin=async function(e){
-    if(e)e.preventDefault();
-    const email=(document.getElementById("email")?.value||"").trim().toLowerCase();
-    const password=document.getElementById("password")?.value||"";
-    const status=document.getElementById("loginStatus");
-    const error=document.getElementById("loginError");
-    const btn=document.getElementById("loginSubmit");
-    if(!status||!btn)return false;
-    if(!email||!password){status.className="login-status error";status.textContent="Email और Password दोनों भरें।";return false;}
-    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){status.className="login-status error";status.textContent="सही email address डालें।";return false;}
-    btn.disabled=true;btn.textContent="Login हो रहा है…";status.className="login-status loading";status.textContent="Login हो रहा है…";error.textContent="";
-    try{
-      const r=await fetch("https://awaazrajasthan.onrender.com/api/admin/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password})});
-      let d={};try{d=await r.json()}catch(_){}
-      if(!r.ok)throw new Error(d.message||("Login failed ("+r.status+")"));
-      if(!d.admin)throw new Error("Login response invalid है।");
-      status.className="login-status success";status.textContent="Login सफल — Admin Panel खुल रहा है…";
-      sessionStorage.setItem("awaaz_admin_token",d.token||"");
-      me=d.admin;
-      document.getElementById("login")?.classList.add("hidden");
-      document.getElementById("panel")?.classList.remove("hidden");
-      if(typeof window.loadAll==="function"){try{await window.loadAll();}catch(_){}}
-      status.className="login-status success";
-      status.textContent="Admin Panel खुल गया है ✓";
-    }catch(err){
-      status.className="login-status error";
-      status.textContent=err.message||"Login failed";
-      error.textContent="Backend: "+(err.message||"Authentication failed");
-    }finally{btn.disabled=false;if(btn.textContent==="Login हो रहा है…")btn.textContent="↪ Login";}
-    return false;
-  };
-  window.addEventListener("DOMContentLoaded",function(){
-    document.getElementById("loginSubmit")?.addEventListener("click",runLogin,{capture:true});
-    document.getElementById("loginForm")?.addEventListener("submit",runLogin,{capture:true});
-  });
-})();
-</script>
+
 </body>
 </html>
