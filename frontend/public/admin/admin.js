@@ -13,12 +13,32 @@ let me=null,news=[],ads=[],admins=[];
 const DEFAULT_API_BASE="http://localhost:5000";
 function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?DEFAULT_API_BASE:"";}
 function setApiBase(){return getApiBase();}
-function readStoredAdminToken(){try{return sessionStorage.getItem("awaaz_admin_token")||localStorage.getItem("awaaz_admin_token")||"";}catch{return "";}}
-function saveStoredAdminToken(token,remember=false){try{if(token)sessionStorage.setItem("awaaz_admin_token",token);else sessionStorage.removeItem("awaaz_admin_token");}catch{}try{if(token&&remember)localStorage.setItem("awaaz_admin_token",token);else localStorage.removeItem("awaaz_admin_token");}catch{}}
-function clearStoredAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");}catch{}try{localStorage.removeItem("awaaz_admin_token");}catch{}}
+function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");}catch{}try{localStorage.removeItem("awaaz_admin_token");}catch{}}
 function initApiBase(){}
-async function api(path,options={}){const base=getApiBase();const opts={credentials:"include",...options};opts.headers={"Content-Type":"application/json",...(options.headers||{})};const token=window.__awaazAdminToken||readStoredAdminToken();if(token)opts.headers.Authorization="Bearer "+token;const r=await fetch(base+path,opts);let d={};try{d=await r.json()}catch{}if(!r.ok){if(r.status===429)throw new Error(d.message||"बहुत अधिक login प्रयास हुए हैं। कुछ मिनट बाद फिर कोशिश करें।");if(r.status===401)throw new Error(d.message||"ईमेल या पासवर्ड गलत है।");throw new Error(d.message||`Request failed (${r.status})`);}return d;}
-async function uploadMedia(file){if(!file)return "";if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");const base=getApiBase();const form=new FormData();form.append("file",file);const headers={};if(window.__awaazAdminToken)headers.Authorization="Bearer "+window.__awaazAdminToken;const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Image upload failed");return new URL(d.url,base||window.location.origin).href;}
+async function api(path,options={}){
+ const base=getApiBase();
+ const opts={credentials:"include",cache:"no-store",...options};
+ opts.headers={"Content-Type":"application/json",...(options.headers||{})};
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),20000);
+ if(!opts.signal)opts.signal=controller.signal;
+ try{
+  const r=await fetch(base+path,opts);
+  let d={};try{d=await r.json()}catch{}
+  if(!r.ok){
+   if(r.status===401){clearLegacyAdminToken();throw new Error(d.message||"Session expired. कृपया फिर login करें।");}
+   if(r.status===429)throw new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");
+   if(r.status===502||r.status===503||r.status===504)throw new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");
+   throw new Error(d.message||`Request failed (${r.status})`);
+  }
+  return d;
+ }catch(error){
+  if(error?.name==="AbortError")throw new Error("Server response आने में ज्यादा समय लग रहा है। Internet/Server connection check करें।");
+  if(error instanceof TypeError)throw new Error("Server से connection नहीं हो पाया। Internet connection check करें।");
+  throw error;
+ }finally{clearTimeout(timeout);}
+}
+async function uploadMedia(file){if(!file)return "";if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");const base=getApiBase();const form=new FormData();form.append("file",file);const headers={};const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Image upload failed");return new URL(d.url,base||window.location.origin).href;}
 function esc(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));}
 function toast(msg){const e=document.createElement("div");e.className="toast";e.textContent=msg;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
 function formatDate(value){if(!value)return "अभी तक कोई subscription नहीं";try{return new Date(value).toLocaleString("hi-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return "अभी तक कोई subscription नहीं";}}
@@ -26,8 +46,19 @@ function toLocalDateTime(value){if(!value)return "";const d=new Date(value);if(N
 function nullableDate(id){const value=$(id)?.value||"";return value?new Date(value).toISOString():null;}
 function updateNewsPlacement(){const c=$("newsCategory")?.value||"",l=$("newsLocation")?.value||"";const box=$("newsPlacementPreview");if(!box)return;if(!c||!l){box.innerHTML="<b>Placement</b><span>पहले श्रेणी और जिला चुनें।</span>";return;}box.innerHTML="<b>यह खबर जाएगी:</b><span>"+esc(c)+" section · "+esc(l)+" जिला</span><small>वेबसाइट के category और district filters इसी saved data पर काम करेंगे।</small>";box.classList.remove("hidden");}
 function previewMedia(inputId,urlId,boxId){const box=$(boxId);if(!box)return;const file=$(inputId)?.files?.[0],url=$(urlId)?.value?.trim()||"";if(!file&&!url){box.classList.add("hidden");box.innerHTML="";return;}const src=file?URL.createObjectURL(file):url;const isVideo=file?String(file.type||"").startsWith("video/"):/\.(mp4|webm|ogg)(\?|#|$)/i.test(url);box.innerHTML=isVideo?`<video src="${esc(src)}" controls muted playsinline></video>`:`<img src="${esc(src)}" alt="Media preview">`;box.classList.remove("hidden");}
-async function boot(){initApiBase();try{window.__awaazAdminToken=window.__awaazAdminToken||readStoredAdminToken()||"";me=(await api("/api/admin/me")).admin;showPanel();await loadAll();await loadProfile()}catch{clearStoredAdminToken();window.__awaazAdminToken="";showLogin()}}
-window.awaazAdminCompleteLogin=async function(admin,token){window.__awaazAdminToken=token||"";saveStoredAdminToken(window.__awaazAdminToken,Boolean($("rememberLogin")?.checked));me=admin;showPanel();const status=$("loginStatus");if(status){status.className="login-status success";status.textContent="Admin Panel खुल रहा है…";}try{await loadAll();await loadProfile();}catch(e){console.error("ADMIN_POST_LOGIN_LOAD_FAILED",e);toast("Login सफल है। Dashboard data बाद में refresh किया जा सकता है।");}};
+async function boot(){
+ initApiBase();
+ try{
+  clearLegacyAdminToken();
+  me=(await api("/api/admin/me")).admin;
+  showPanel();
+  await loadAll();
+  await loadProfile();
+ }catch{
+  clearLegacyAdminToken();
+  showLogin();
+ }
+}
 function showLogin(){$("login").classList.remove("hidden");$("panel").classList.add("hidden")}
 function hasPermission(permission){return me?.role==="owner" || (Array.isArray(me?.permissions) && me.permissions.includes(permission));}
 function applyPermissionUI(){
@@ -45,7 +76,38 @@ function applyPermissionUI(){
  const badge=$("permissionSummary"); if(badge) badge.textContent=owner?"Owner • Full Control":((me?.permissions||[]).length+" permissions active");
 }
 function showPanel(){$("login").classList.add("hidden");$("panel").classList.remove("hidden");applyPermissionUI()}
-const handleLogin=async e=>{e?.preventDefault();if(window.__awaazLoginInFlight)return;window.__awaazLoginInFlight=true;setApiBase();const email=$("email").value.trim().toLowerCase(),password=$("password").value;const status=$("loginStatus"),error=$("loginError"),btn=$("loginSubmit");error.textContent="";status.className="login-status loading";status.textContent="Login हो रहा है…";if(!email||!password){status.className="login-status error";status.textContent="Email और Password दोनों भरें।";return;}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){status.className="login-status error";status.textContent="सही email address डालें।";$("email").focus();return;}btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";try{const r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});if(!r?.admin||!r?.token)throw new Error("Login response invalid है।");window.__awaazAdminToken=r.token;saveStoredAdminToken(r.token,Boolean($("rememberLogin")?.checked));me=r.admin;showPanel();status.className="login-status success";status.textContent="Admin Panel खुल रहा है…";try{await loadAll();await loadProfile();}catch(loadErr){console.error("ADMIN_POST_LOGIN_LOAD_FAILED",loadErr);toast("Login सफल है, लेकिन कुछ dashboard data अभी load नहीं हुआ।")} }catch(err){status.className="login-status error";status.textContent=err.message||"Login failed";error.textContent=""}finally{btn.disabled=false;btn.textContent=btn.dataset.oldText||"↪ Login";window.__awaazLoginInFlight=false;}}; $("loginForm").onsubmit=handleLogin;
+const handleLogin=async e=>{
+ e?.preventDefault();
+ if(window.__awaazLoginInFlight)return;
+ const email=$("email").value.trim().toLowerCase(),password=$("password").value;
+ const status=$("loginStatus"),error=$("loginError"),btn=$("loginSubmit");
+ if(!email||!password){status.className="login-status error";status.textContent="Email और Password दोनों भरें।";return;}
+ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){status.className="login-status error";status.textContent="सही email address डालें।";$("email").focus();return;}
+ window.__awaazLoginInFlight=true;
+ error.textContent="";
+ status.className="login-status loading";
+ status.textContent="Login हो रहा है…";
+ btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
+ try{
+  const r=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
+  if(!r?.ok||!r?.admin)throw new Error("Login response invalid है।");
+  me=r.admin;
+  showPanel();
+  status.className="login-status success";
+  status.textContent="Admin Panel खुल रहा है…";
+  try{await loadAll();await loadProfile();}
+  catch(loadErr){console.error("ADMIN_POST_LOGIN_LOAD_FAILED",loadErr);toast("Login सफल है। Dashboard data refresh किया जा सकता है।");}
+ }catch(err){
+  status.className="login-status error";
+  status.textContent=err.message||"Login failed";
+  error.textContent="";
+ }finally{
+  btn.disabled=false;
+  btn.textContent=btn.dataset.oldText||"↪ Login";
+  window.__awaazLoginInFlight=false;
+ }
+};
+$("loginForm").onsubmit=handleLogin;
 $("openForgotPassword")?.addEventListener("click",()=>{$("forgotPasswordBox").classList.toggle("hidden");$("forgotPasswordMsg").textContent="";});
 $("sendForgotOtp")?.addEventListener("click",async()=>{
  const email=$("forgotEmail").value.trim().toLowerCase();
@@ -69,7 +131,7 @@ $("resetForgotPassword")?.addEventListener("click",async()=>{
  }catch(e){$("forgotPasswordMsg").textContent=e.message||"Password reset नहीं हुआ।"}
  finally{btn.disabled=false;}
 });
-$("logout").onclick=async()=>{try{await api("/api/admin/logout",{method:"POST"})}finally{clearStoredAdminToken();window.__awaazAdminToken="";location.replace("/admin/?logout="+Date.now())}};
+$("logout").onclick=async()=>{try{await api("/api/admin/logout",{method:"POST"})}finally{clearLegacyAdminToken();location.replace("/admin/?logout="+Date.now())}};
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=async()=>{document.querySelectorAll(".tabs button,.tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");$(b.dataset.tab).classList.add("active");try{const t=b.dataset.tab;if(t==="dashboard")await loadDashboard();else if(t==="news")await loadNews();else if(t==="ads")await loadAds();else if(t==="adbookings")await loadAdBookings();else if(t==="adfees")await loadAdFees();else if(t==="adpricing")await loadAdPrices();else if(t==="categories")await loadCategories();else if(t==="homebuttons")await loadHomeButtons();else if(t==="legal")await loadLegal();else if(t==="admins"){await loadAdmins();await loadOtpAdmins()}else if(t==="permissions"){await loadAdmins();loadPermissionManager()}else if(t==="epaper")await loadEpapers();else if(t==="profile")await loadProfile();}catch(e){toast(e.message||"Data load failed")}});
 $("goBreaking").onclick=()=>{if(!hasPermission("news:write"))return toast("आपको News Write permission नहीं दी गई है।");const tab=document.querySelector('[data-tab="news"]');if(!tab)return toast("News Manager उपलब्ध नहीं है।");tab.click();$("newsForm").classList.remove("hidden");$("newsForm").scrollIntoView({behavior:"smooth",block:"start"});$("newsTitle")?.focus();};
 
@@ -125,11 +187,11 @@ $("refreshAdBookings")?.addEventListener("click",loadAdBookings);
 $("bookingStatusFilter")?.addEventListener("change",loadAdBookings);
 
 async function loadProfile(){try{const r=await api("/api/admin/profile"),a=r.admin||{};$("profileEmail").value=a.email||"";$("profilePassword").value="";$("profileAvatar").value=a.avatar||"";const box=$("profileAvatarPreview");if(box){if(a.avatar){box.innerHTML='<img src="'+esc(a.avatar)+'" alt="Profile photo preview">';box.classList.remove("hidden")}else{box.classList.add("hidden");box.innerHTML=""}}}catch(e){toast(e.message)}}
-async function uploadProfilePhoto(file){if(!file)return "";if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP या GIF photo चुनें");const form=new FormData();form.append("file",file);const headers={};if(window.__awaazAdminToken)headers.Authorization="Bearer "+window.__awaazAdminToken;const r=await fetch(getApiBase()+"/api/admin/profile/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Profile photo upload failed");return d.url||d.relativeUrl||"";}
+async function uploadProfilePhoto(file){if(!file)return "";if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP या GIF photo चुनें");const form=new FormData();form.append("file",file);const headers={};const r=await fetch(getApiBase()+"/api/admin/profile/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Profile photo upload failed");return d.url||d.relativeUrl||"";}
 $("profileAvatarFile")?.addEventListener("change",async()=>{const file=$("profileAvatarFile").files?.[0];if(!file)return;try{const box=$("profileAvatarPreview");box.innerHTML='<img src="'+esc(URL.createObjectURL(file))+'" alt="Profile photo preview">';box.classList.remove("hidden")}catch{}});
-$("profileForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter||$("profileForm").querySelector("button[type=submit]");if(btn)btn.disabled=true;try{const currentEmail=String(me?.email||"").trim().toLowerCase();const email=$("profileEmail").value.trim().toLowerCase();let avatar=$("profileAvatar").value.trim();const file=$("profileAvatarFile").files?.[0];if(file){toast("Profile photo upload हो रही है…");avatar=await uploadProfilePhoto(file);$("profileAvatar").value=avatar;}const body={};if(email&&email!==currentEmail)body.email=email;const currentAvatar=String(me?.avatar||"").trim();if(avatar!==currentAvatar)body.avatar=avatar;const password=$("profilePassword").value;if(password)body.password=password;if(!Object.keys(body).length){toast("कोई बदलाव नहीं किया गया।");return;}const r=await api("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});if(r.token)window.__awaazAdminToken=r.token;me=r.admin||me;toast("Profile successfully updated");$("profilePassword").value="";$("profileAvatarFile").value="";await loadProfile();applyPermissionUI();}catch(err){toast(err.message)}finally{if(btn)btn.disabled=false;}});
+$("profileForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter||$("profileForm").querySelector("button[type=submit]");if(btn)btn.disabled=true;try{const currentEmail=String(me?.email||"").trim().toLowerCase();const email=$("profileEmail").value.trim().toLowerCase();let avatar=$("profileAvatar").value.trim();const file=$("profileAvatarFile").files?.[0];if(file){toast("Profile photo upload हो रही है…");avatar=await uploadProfilePhoto(file);$("profileAvatar").value=avatar;}const body={};if(email&&email!==currentEmail)body.email=email;const currentAvatar=String(me?.avatar||"").trim();if(avatar!==currentAvatar)body.avatar=avatar;const password=$("profilePassword").value;if(password)body.password=password;if(!Object.keys(body).length){toast("कोई बदलाव नहीं किया गया।");return;}const r=await api("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});me=r.admin||me;toast("Profile successfully updated");$("profilePassword").value="";$("profileAvatarFile").value="";await loadProfile();applyPermissionUI();}catch(err){toast(err.message)}finally{if(btn)btn.disabled=false;}});
 async function loadAll(){const tasks=[];if(hasPermission("news:read")||hasPermission("news:write")||hasPermission("news:delete")){tasks.push(refreshCategories());if(hasPermission("news:read"))tasks.push(loadNews())}if(me?.role==="owner"){tasks.push(loadAds(),loadAdBookings(),loadAdFees(),loadAdPrices(),loadAdmins(),loadOtpAdmins(),loadNotificationStatus(),loadCategories(),loadHomeButtons(),loadLegal(),loadEpapers())}const results=await Promise.allSettled([loadDashboard(),...tasks]);const failed=results.filter(x=>x.status==="rejected");if(failed.length)toast(failed.length+" section का data load नहीं हुआ — संबंधित tab में Refresh करें।");}
-async function uploadEpaper(file){if(!file||file.type!=="application/pdf")throw new Error("केवल PDF ई-पेपर चुनें।");const base=getApiBase(),form=new FormData();form.append("file",file);const headers={};if(window.__awaazAdminToken)headers.Authorization="Bearer "+window.__awaazAdminToken;const r=await fetch(base+"/api/admin/epapers/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"E-paper upload failed");return d.url||d.pdf;}
+async function uploadEpaper(file){if(!file||file.type!=="application/pdf")throw new Error("केवल PDF ई-पेपर चुनें।");const base=getApiBase(),form=new FormData();form.append("file",file);const headers={};const r=await fetch(base+"/api/admin/epapers/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"E-paper upload failed");return d.url||d.pdf;}
 async function loadEpapers(){if(me?.role!=="owner")return;try{const r=await api("/api/admin/epapers");const items=Array.isArray(r.epapers)?r.epapers:(Array.isArray(r.data)?r.data:[]);$("epaperList").innerHTML=items.map(x=>'<div class="list-row"><div><b>'+esc(x.title||"ई-पेपर")+'</b><small>'+esc(formatDate(x.issueDate))+' · '+esc(x.status)+'</small></div><div><button onclick="window.open('+JSON.stringify(x.pdf.startsWith("http")?x.pdf:getApiBase()+x.pdf)+',"_blank")">Open PDF</button><button class="danger" onclick="deleteEpaper(this.dataset.id)" data-id="'+esc(x._id)+'">Delete</button></div></div>').join("")||"<p>अभी कोई ई-पेपर upload नहीं है।</p>"}catch(e){$("epaperList").innerHTML="<p>"+esc(e.message)+"</p>"}}
 $("epaperFile")?.addEventListener("change",e=>{const f=e.target.files?.[0];$("epaperFileName").innerHTML=f?"<b>"+esc(f.name)+"</b> · "+(f.size/1024/1024).toFixed(2)+" MB":"<span>केवल PDF चुनें।</span>"});
 $("epaperForm")?.addEventListener("submit",async e=>{e.preventDefault();const file=$("epaperFile").files?.[0],date=$("epaperDate").value;if(!file||!date){toast("PDF और edition date दोनों भरें");return;}const btn=e.submitter;btn.disabled=true;btn.textContent="Uploading...";try{const pdf=await uploadEpaper(file);await api("/api/admin/epapers",{method:"POST",body:JSON.stringify({title:$("epaperTitle").value.trim()||"आज का ई-पेपर",issueDate:date,pdf,status:$("epaperStatus").value})});toast("ई-पेपर save हो गया");$("epaperForm").reset();$("epaperTitle").value="आज का ई-पेपर";await loadEpapers()}catch(err){toast(err.message)}finally{btn.disabled=false;btn.textContent="📤 ई-पेपर Publish करें"}});
