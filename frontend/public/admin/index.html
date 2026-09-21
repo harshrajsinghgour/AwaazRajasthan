@@ -62,7 +62,7 @@
 </main>
 </section>
 </div>
-<script id="adminAppScript" src="/admin/admin.js?v=20260921-login15" defer></script>
+<script id="adminAppScript" src="/admin/admin.js?v=20260921-login16" defer></script>
 <script>
 (function(){
   var form=document.getElementById("loginForm");
@@ -87,17 +87,17 @@
       if(btn)btn.disabled=true;
       if(status){status.className="login-status loading";status.textContent="Login हो रहा है…";}
       try{
-        var r=await fetch("/api/admin/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})});
+        var r=await fetch("/api/admin/login?ts="+Date.now(),{method:"POST",credentials:"include",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})});
         var d={};try{d=await r.json();}catch(_){}
         if(!r.ok)throw new Error(d.message||"ईमेल या पासवर्ड गलत है।");
         saveToken(d.token||"");
         if(status){status.className="login-status success";status.textContent="Login सफल — Admin Panel खोला जा रहा है…";}
-        window.location.replace("/admin/?login="+Date.now());
+        window.location.replace("/admin/?auth="+Date.now());
       }catch(err){
         if(status){status.className="login-status error";status.textContent=err.message||"Login failed";}
       }finally{if(btn)btn.disabled=false;}
     });
   }
-  setTimeout(bindFallback,900);
+  setTimeout(bindFallback,700);
 })();
 </script>
