@@ -31,7 +31,7 @@ function applyPermissionUI(){
  const owner=me?.role==="owner", newsRead=hasPermission("news:read"), newsWrite=hasPermission("news:write"), mediaWrite=hasPermission("media:write"), newsDelete=hasPermission("news:delete"), newsAny=newsRead||newsWrite||newsDelete;
  const tabNews=document.querySelector('[data-tab="news"]');
  if(tabNews) tabNews.style.display=newsAny?"":"none";
- [["ads",owner],["admins",owner],["epaper",owner],["categories",owner],["homebuttons",owner],["adbookings",owner],["adfees",owner],["adpricing",owner]].forEach(([id,ok])=>{const b=document.querySelector('[data-tab="'+id+'"]');if(b)b.style.display=ok?"":"none";});
+ [["ads",owner],["admins",owner],["epaper",owner],["categories",owner],["homebuttons",owner],["legal",owner],["adbookings",owner],["adfees",owner],["adpricing",owner]].forEach(([id,ok])=>{const b=document.querySelector('[data-tab="'+id+'"]');if(b)b.style.display=ok?"":"none";});
  $("notificationControl")?.classList.toggle("hidden",!owner);
  $("newNews")?.classList.toggle("hidden",!newsWrite);
  $("newsForm")?.classList.toggle("hidden",!newsWrite);
