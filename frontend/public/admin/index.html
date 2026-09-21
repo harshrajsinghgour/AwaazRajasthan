@@ -62,42 +62,4 @@
 </main>
 </section>
 </div>
-<script id="adminAppScript" src="/admin/admin.js?v=20260921-login17" defer></script>
-<script>
-(function(){
-  var form=document.getElementById("loginForm");
-  if(!form)return;
-  function saveToken(token){
-    if(!token)return;
-    try{sessionStorage.setItem("awaaz_admin_token",token);}catch(_){}
-    var remember=document.getElementById("rememberLogin");
-    if(remember&&remember.checked){try{localStorage.setItem("awaaz_admin_token",token);}catch(_){}}
-  }
-  function bindFallback(){
-    if(typeof window.awaazAdminCompleteLogin==="function")return;
-    if(form.dataset.fallbackBound==="1")return;
-    form.dataset.fallbackBound="1";
-    form.addEventListener("submit",async function(e){
-      e.preventDefault();
-      var email=(document.getElementById("email")||{}).value||"";
-      var password=(document.getElementById("password")||{}).value||"";
-      var status=document.getElementById("loginStatus"),btn=document.getElementById("loginSubmit");
-      email=email.trim().toLowerCase();
-      if(!email||!password){if(status)status.textContent="Email और Password दोनों भरें।";return;}
-      if(btn)btn.disabled=true;
-      if(status){status.className="login-status loading";status.textContent="Login हो रहा है…";}
-      try{
-        var r=await fetch("/api/admin/login?ts="+Date.now(),{method:"POST",credentials:"include",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email,password:password})});
-        var d={};try{d=await r.json();}catch(_){}
-        if(!r.ok)throw new Error(d.message||"ईमेल या पासवर्ड गलत है।");
-        saveToken(d.token||"");
-        if(status){status.className="login-status success";status.textContent="Login सफल — Admin Panel खोला जा रहा है…";}
-        window.location.replace("/admin/?auth="+Date.now());
-      }catch(err){
-        if(status){status.className="login-status error";status.textContent=err.message||"Login failed";}
-      }finally{if(btn)btn.disabled=false;}
-    });
-  }
-  setTimeout(function(){bindFallback();},5000);
-})();
-</script>
+<script id="adminAppScript" src="/admin/admin.js?v=20260921-login18" defer></script>
