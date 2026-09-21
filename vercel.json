@@ -2,28 +2,6 @@
   "buildCommand": "npm run build",
   "outputDirectory": "frontend/dist",
   "installCommand": "npm install",
-  "rewrites": [
-    {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    },
-    {
-      "source": "/admin/",
-      "destination": "/admin/index.html"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "https://awaazrajasthan.onrender.com/api/:path*"
-    },
-    {
-      "source": "/news/:id*",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/((?!admin(?:/|$)).*)",
-      "destination": "/index.html"
-    }
-  ],
   "headers": [
     {
       "source": "/((?!admin(?:/|$)).*)",
@@ -58,6 +36,31 @@
           "value": "public, max-age=31536000, immutable"
         }
       ]
+    }
+  ],
+  "routes": [
+    {
+      "src": "^/admin/?$",
+      "dest": "/admin/index.html"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "^/api/(.*)$",
+      "dest": "https://awaazrajasthan.onrender.com/api/$1"
+    },
+    {
+      "src": "^/sitemap\\.xml$",
+      "dest": "https://awaazrajasthan.onrender.com/api/sitemap.xml"
+    },
+    {
+      "src": "^/news/(.*)$",
+      "dest": "/index.html"
+    },
+    {
+      "src": "^/(.*)$",
+      "dest": "/index.html"
     }
   ]
 }
