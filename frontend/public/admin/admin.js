@@ -15,7 +15,8 @@ function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostnam
 function setApiBase(){return getApiBase();}
 function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");}catch{}try{localStorage.removeItem("awaaz_admin_token");}catch{}}
 function initApiBase(){}
-async function api(path,options={}){
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function api(path,options={},attempt=0){
  const base=getApiBase();
  const opts={credentials:"include",cache:"no-store",...options};
  opts.headers={"Content-Type":"application/json",...(options.headers||{})};
@@ -26,6 +27,7 @@ async function api(path,options={}){
   const r=await fetch(base+path,opts);
   let d={};try{d=await r.json()}catch{}
   if(!r.ok){
+   if((r.status===502||r.status===503||r.status===504)&&attempt<2){await sleep(500*(attempt+1));return api(path,options,attempt+1);}
    if(r.status===401){clearLegacyAdminToken();throw new Error(d.message||"Session expired. कृपया फिर login करें।");}
    if(r.status===429)throw new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");
    if(r.status===502||r.status===503||r.status===504)throw new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");
@@ -48,13 +50,15 @@ function updateNewsPlacement(){const c=$("newsCategory")?.value||"",l=$("newsLoc
 function previewMedia(inputId,urlId,boxId){const box=$(boxId);if(!box)return;const file=$(inputId)?.files?.[0],url=$(urlId)?.value?.trim()||"";if(!file&&!url){box.classList.add("hidden");box.innerHTML="";return;}const src=file?URL.createObjectURL(file):url;const isVideo=file?String(file.type||"").startsWith("video/"):/\.(mp4|webm|ogg)(\?|#|$)/i.test(url);box.innerHTML=isVideo?`<video src="${esc(src)}" controls muted playsinline></video>`:`<img src="${esc(src)}" alt="Media preview">`;box.classList.remove("hidden");}
 async function boot(){
  initApiBase();
+ clearLegacyAdminToken();
  try{
-  clearLegacyAdminToken();
-  me=(await api("/api/admin/me")).admin;
+  const session=await api("/api/admin/me");
+  if(!session?.admin)throw new Error("No active admin session");
+  me=session.admin;
   showPanel();
-  await loadAll();
-  await loadProfile();
- }catch{
+  try{await loadAll();await loadProfile();}
+  catch(error){console.error("ADMIN_BOOT_DATA_LOAD_FAILED",error);toast("Login सफल है। Dashboard data थोड़ी देर में Refresh करें।");}
+ }catch(error){
   clearLegacyAdminToken();
   showLogin();
  }
@@ -89,21 +93,11 @@ const handleLogin=async e=>{
  status.textContent="Login हो रहा है…";
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
  try{
-  const loginResponse=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
-  // Login success is confirmed by the authenticated session endpoint, not by
-  // the shape of the login JSON. This prevents false "invalid response" errors
-  // when a proxy/CDN changes the response envelope.
-  let session;
-  try{
-   session=await api("/api/admin/me");
-  }catch(sessionError){
-   if(loginResponse?.admin){
-    session={admin:loginResponse.admin};
-   }else{
-    throw new Error("Login सफल हुआ, लेकिन secure session स्थापित नहीं हो पाई। कृपया फिर से Login करें।");
-   }
-  }
-  if(!session?.admin)throw new Error("Login सफल हुआ, लेकिन admin session verify नहीं हो पाई।");
+  await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
+  // Never trust the login response alone: the browser must be able to use the
+  // secure HttpOnly session cookie immediately after login.
+  const session=await api("/api/admin/me");
+  if(!session?.admin)throw new Error("Secure admin session verify नहीं हो पाई। कृपया फिर से Login करें।");
   me=session.admin;
   showPanel();
   status.className="login-status success";
