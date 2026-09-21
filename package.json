@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "start": "cd backend && npm start",
-    "build": "cd backend && npm install",
-    "postinstall": "cd backend && npm install --omit=dev"
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "postinstall": "node -e \"console.log('Awaaz Rajasthan root install ready')\""
   }
 }
