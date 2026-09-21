@@ -70,3 +70,12 @@
 .card-meta button.saved .wa-icon,.row-bottom button.saved .wa-icon,.article-toolbar button.saved .wa-icon{stroke:#6b7280;fill:#6b7280}
 .card-meta button.saved:after,.row-bottom button.saved:after{content:"✓";font-size:11px;font-weight:900;margin-left:3px}
 .quick-tools button.selected{background:#e9ecef!important;color:#5f6872!important;border-color:#cfd4da!important}
+
+
+/* Quick tools — keep all actions visually neutral, including advertisement booking */
+.quick-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:20px 0}
+.quick-tools .quick-tool{min-height:64px;display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 16px;border:1px solid var(--line);border-radius:18px;background:var(--card);color:var(--ink);box-shadow:var(--shadow);font-weight:800;text-align:center;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background .18s ease}
+.quick-tools .quick-tool:hover{transform:translateY(-1px);border-color:#d7dce2}
+.quick-tools .quick-tool:active{transform:translateY(0)}
+.quick-tools .quick-tool:first-child{background:var(--card);color:var(--ink);border-color:var(--line)}
+@media(max-width:767px){.quick-tools{gap:12px;margin:18px 0}.quick-tools .quick-tool{min-height:64px;border-radius:17px;padding:13px 10px;font-size:16px}}
