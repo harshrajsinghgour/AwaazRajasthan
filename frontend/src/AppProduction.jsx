@@ -371,28 +371,43 @@ export default function AppProduction() {
   function closeArticle() { setArticle(null); const target = window.location.pathname.startsWith("/news/") ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
 
   async function enableNotifications() {
-    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotifyState("error"); setToast("इस डिवाइस पर पुश नोटिफिकेशन उपलब्ध नहीं है"); return; }
-    if (!vapidPublicKey) { setNotifyState("error"); setToast("नोटिफिकेशन सेवा अभी कॉन्फ़िगर नहीं है"); return; }
-    
+    if (!window.isSecureContext && location.hostname !== "localhost") { setNotifyState("error"); setToast("नोटिफिकेशन के लिए HTTPS जरूरी है।"); return; }
+    if (!("Notification" in window) || !("serviceWorker" in navigator) || !("PushManager" in window)) { setNotifyState("error"); setToast("इस डिवाइस/ब्राउज़र पर पुश नोटिफिकेशन उपलब्ध नहीं है।"); return; }
     setNotifyState("loading");
     try {
-      if (Notification.permission === "denied") { setNotifyState("error"); setToast("Chrome में इस वेबसाइट के Notifications Block हैं। Site settings में जाकर Notifications → Allow करें, फिर पेज Reload करें।"); return; }
+      if (Notification.permission === "denied") throw new Error("denied");
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (permission !== "granted") throw new Error("permission");
-      const reg = await navigator.serviceWorker.register("/sw.js");
+      let publicKey = String(vapidPublicKey || "").trim();
+      if (!publicKey) {
+        const keyResponse = await fetch("/api/notifications/public-key?ts="+Date.now(), { headers: { Accept: "application/json" }, cache: "no-store" });
+        if (!keyResponse.ok) throw new Error("config");
+        const keyData = await keyResponse.json();
+        publicKey = String(keyData?.publicKey || "").trim();
+        if (publicKey) setVapidPublicKey(publicKey);
+      }
+      if (!publicKey) throw new Error("config");
+      const reg = await navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" });
+      await reg.update().catch(() => {});
       let subscription = await reg.pushManager.getSubscription();
       if (!subscription) {
-        const pad = "=".repeat((4 - vapidPublicKey.length % 4) % 4);
-        const base64 = (vapidPublicKey + pad).replace(/-/g, "+").replace(/_/g, "/");
-        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        const pad = "=".repeat((4 - publicKey.length % 4) % 4);
+        const base64 = (publicKey + pad).replace(/-/g, "+").replace(/_/g, "/");
+        const bytes = Uint8Array.from(atob(base64), ch => ch.charCodeAt(0));
         subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes });
       }
-      const response = await fetch(`${API_BASE}/api/notifications/subscribe`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(subscription) });
-      if (!response.ok) throw new Error("subscribe-api");
-      setNotifyState("enabled"); setToast("ब्रेकिंग न्यूज़ नोटिफिकेशन चालू हो गए");
+      const response = await fetch("/api/notifications/subscribe", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(subscription), cache: "no-store" });
+      if (!response.ok) {
+        let detail = "";
+        try { const data = await response.json(); detail = String(data?.message || ""); } catch {}
+        throw new Error(detail || "subscribe-api");
+      }
+      setNotifyState("enabled");
+      setToast("🔔 ब्रेकिंग न्यूज़ नोटिफिकेशन चालू हो गए");
     } catch (error) {
       setNotifyState("error");
-      setToast(error?.message === "subscribe-api" ? "नोटिफिकेशन सर्वर से कनेक्शन नहीं हो पाया" : error?.message === "permission" ? "नोटिफिकेशन की अनुमति नहीं मिली। Chrome में Notifications → Allow करें।" : "नोटिफिकेशन चालू नहीं हो पाए। फिर से कोशिश करें।");
+      const message = error?.message;
+      setToast(message === "denied" ? "Chrome में इस वेबसाइट के Notifications Block हैं। Site settings → Notifications → Allow करें।" : message === "permission" ? "नोटिफिकेशन की अनुमति नहीं मिली।" : message === "config" ? "नोटिफिकेशन सेवा अभी सर्वर पर कॉन्फ़िगर नहीं है।" : message === "subscribe-api" ? "नोटिफिकेशन सर्वर से subscription save नहीं हो पाया।" : (message || "नोटिफिकेशन चालू नहीं हो पाए। फिर से कोशिश करें।"));
     }
   }
   async function installApp() { if (appInstalled) { setToast("आवाज़ राजस्थान ऐप इस डिवाइस पर पहले से इंस्टॉल है"); return; } if (!installPrompt) { setToast("ऐप इंस्टॉल करने के लिए Chrome के ⋮ मेनू में “Add to Home screen” या “Install app” चुनें।"); return; } try { await installPrompt.prompt(); await installPrompt.userChoice; } catch {} finally { setInstallPrompt(null); } }
