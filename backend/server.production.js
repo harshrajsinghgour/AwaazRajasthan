@@ -57,7 +57,7 @@ app.use(express.json({limit:"1mb"}));
 app.use(express.urlencoded({extended:true,limit:"1mb"}));
 app.use(cookieParser());
 app.use(morgan(PROD?"combined":"dev"));
-app.use("/api",rateLimit({windowMs:15*60*1000,limit:500,standardHeaders:"draft-8",legacyHeaders:false}));
+app.use("/api",rateLimit({windowMs:15*60*1000,limit:500,standardHeaders:"draft-8",legacyHeaders:false,skip:req=>req.path==="/admin/login"}));
 app.use("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:20,standardHeaders:"draft-8",legacyHeaders:false}));
 app.use("/api/admin/change-password",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}));
 const adImpressionLimiter=rateLimit({windowMs:15*60*1000,limit:120,standardHeaders:"draft-8",legacyHeaders:false});
@@ -224,10 +224,45 @@ async function verifyB2Storage(){
  }
 }
 
-async function auth(req,res,next){try{const token=req.cookies.awaaz_admin||String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");if(!token)return res.status(401).json({message:"Authentication required"});const p=jwt.verify(token,JWT_SECRET||"development-secret"),a=await Admin.findById(p.sub);if(!a||!a.active||Number(p.sv||0)!==Number(a.sessionVersion||0))return res.status(401).json({message:"Session expired"});req.admin=a;next();}catch{res.status(401).json({message:"Invalid or expired session"});}}
-async function optionalAuth(req,_res,next){try{const token=req.cookies.awaaz_admin||String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");if(token){const p=jwt.verify(token,JWT_SECRET||"development-secret"),a=await Admin.findById(p.sub);if(a&&a.active&&Number(p.sv||0)===Number(a.sessionVersion||0))req.admin=a;}}catch{}next();}
-function setCookie(res,t){const secure=process.env.COOKIE_SECURE!=="false";res.cookie("awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:ADMIN_COOKIE_MAX_AGE,path:"/"});}
-function clearCookie(res){const secure=process.env.COOKIE_SECURE!=="false";res.clearCookie("awaaz_admin",{httpOnly:true,secure,sameSite:secure?"none":"lax",path:"/"});}
+async function auth(req,res,next){
+ try{
+  const cookieToken=req.cookies.__Host_awaaz_admin||req.cookies.awaaz_admin||"";
+  const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+  const token=cookieToken||bearer;
+  if(!token)return res.status(401).json({message:"Authentication required"});
+  const p=jwt.verify(token,JWT_SECRET||"development-secret");
+  const a=await Admin.findById(p.sub);
+  if(!a||!a.active||Number(p.sv||0)!==Number(a.sessionVersion||0))return res.status(401).json({message:"Session expired"});
+  req.admin=a;
+  const issuedAt=Number(p.iat||0)*1000;
+  if(issuedAt&&Date.now()-issuedAt>7*24*60*60*1000)setCookie(res,sign(a));
+  next();
+ }catch(error){
+  res.status(401).json({message:error?.name==="TokenExpiredError"?"Session expired":"Invalid or expired session"});
+ }
+}
+async function optionalAuth(req,_res,next){
+ try{
+  const cookieToken=req.cookies.__Host_awaaz_admin||req.cookies.awaaz_admin||"";
+  const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
+  const token=cookieToken||bearer;
+  if(token){
+   const p=jwt.verify(token,JWT_SECRET||"development-secret"),a=await Admin.findById(p.sub);
+   if(a&&a.active&&Number(p.sv||0)===Number(a.sessionVersion||0))req.admin=a;
+  }
+ }catch{}
+ next();
+}
+function setCookie(res,t){
+ const secure=process.env.COOKIE_SECURE!=="false";
+ res.cookie("__Host_awaaz_admin",t,{httpOnly:true,secure,sameSite:secure?"none":"lax",maxAge:ADMIN_COOKIE_MAX_AGE,path:"/"});
+}
+function clearCookie(res){
+ const secure=process.env.COOKIE_SECURE!=="false";
+ const opts={httpOnly:true,secure,sameSite:secure?"none":"lax",path:"/"};
+ res.clearCookie("__Host_awaaz_admin",opts);
+ res.clearCookie("awaaz_admin",opts);
+}
 app.get("/",(_r,res)=>res.json({ok:true,service:"awaaz-rajasthan-api",message:"Awaaz Rajasthan API is live"}));
 app.get("/api/health",(_r,res)=>{const database=mongoose.connection.readyState===1?"connected":"disconnected";const ok=database==="connected";res.status(ok?200:503).json({ok,database,service:"awaaz-rajasthan-api",time:new Date().toISOString()});});
 app.get("/api/notifications/public-key",(_r,res)=>{const key=String(process.env.VAPID_PUBLIC_KEY||"").trim();res.json({publicKey:key});});
@@ -266,7 +301,22 @@ app.post("/api/ads/:id/impression",adImpressionLimiter,async(req,res,next)=>{try
 app.post("/api/ads/:id/click",adClickLimiter,async(req,res,next)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:"Invalid ad id"});const ad=await Ad.findById(req.params.id).select("status startDate endDate").lean();if(!ad||!activeAd(ad))return res.status(404).json({message:"Ad not active"});await Ad.updateOne({_id:req.params.id},{$inc:{clicks:1}});res.status(204).end();}catch(e){next(e);}});
 async function deliverPushToActiveSubscribers({title,body,url="/",tagPrefix="awaaz-news"}){const VAPID_PUBLIC_KEY=cleanEnv(process.env.VAPID_PUBLIC_KEY),VAPID_PRIVATE_KEY=cleanEnv(process.env.VAPID_PRIVATE_KEY),VAPID_SUBJECT=cleanEnv(process.env.VAPID_SUBJECT);if(!VAPID_PUBLIC_KEY||!VAPID_PRIVATE_KEY||!VAPID_SUBJECT)return {configured:false,sent:0,removed:0,failed:0,total:0};webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);const subscribers=await Subscriber.find({active:true}).select("subscription _id").lean();let sent=0,removed=0,failed=0;const payload=JSON.stringify({title:boundedText(title,120),body:boundedText(body,300),url,tag:`${tagPrefix}-${Date.now()}`,renotify:true});for(const row of subscribers){try{await webpush.sendNotification(row.subscription,payload);sent++;await Subscriber.updateOne({_id:row._id},{$set:{lastSuccessAt:new Date()}});}catch(error){if(error?.statusCode===404||error?.statusCode===410){await Subscriber.updateOne({_id:row._id},{$set:{active:false,lastFailureAt:new Date()}});removed++;}else{await Subscriber.updateOne({_id:row._id},{$set:{lastFailureAt:new Date()}});failed++;console.error("Push delivery failed:",error?.statusCode||error?.message||error);}}}return {configured:true,sent,removed,failed,total:subscribers.length};}
 app.post("/api/notifications/subscribe",subscriptionLimiter,async(req,res,next)=>{try{const body=req.body||{},endpoint=String(body.endpoint||"").trim();if(!endpoint||endpoint.length>2048||!isHttpsUrl(endpoint))return res.status(400).json({message:"Invalid subscription endpoint"});if(!body.keys||typeof body.keys!=="object"||Array.isArray(body.keys))return res.status(400).json({message:"Push subscription keys are required"});const p256dh=String(body.keys.p256dh||"").trim(),authKey=String(body.keys.auth||"").trim();if(!p256dh||p256dh.length>512||!authKey||authKey.length>512)return res.status(400).json({message:"Invalid push subscription keys"});if(body.expirationTime!==undefined&&body.expirationTime!==null&&(!Number.isFinite(Number(body.expirationTime))||Number(body.expirationTime)<0))return res.status(400).json({message:"Invalid subscription expiration"});await Subscriber.findOneAndUpdate({endpoint},{subscription:{...body,endpoint,keys:{p256dh,auth:authKey}},active:true},{upsert:true,new:true,setDefaultsOnInsert:true});res.status(201).json({ok:true});}catch(e){next(e);}});
-app.post("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{try{const email=String(req.body.email||"").toLowerCase().trim(),password=String(req.body.password||"");if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});const a=await Admin.findOne({email});const passwordOk=await verifyAdminPassword(a,password);if(!a||!a.active||!passwordOk){console.warn("ADMIN_LOGIN_FAILED",JSON.stringify({email,exists:!!a,active:a?.active===true,hashPresent:!!a?.passwordHash,hashType:a?.passwordHash?String(a.passwordHash).slice(0,4):null}));return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});}a.lastLoginAt=new Date();await a.save();const token=sign(a);setCookie(res,token);res.json({admin:safe(a),token});}catch(e){next(e);}});
+app.post("/api/admin/login",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{
+ try{
+  const email=String(req.body?.email||"").toLowerCase().trim(),password=String(req.body?.password||"");
+  if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});
+  const admin=await Admin.findOne({email});
+  const passwordOk=await verifyAdminPassword(admin,password);
+  if(!admin||!admin.active||!passwordOk){
+   console.warn("ADMIN_LOGIN_FAILED",JSON.stringify({email,exists:!!admin,active:admin?.active===true,hashPresent:!!admin?.passwordHash,hashType:admin?.passwordHash?String(admin.passwordHash).slice(0,4):null}));
+   return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});
+  }
+  admin.lastLoginAt=new Date();
+  await admin.save();
+  setCookie(res,sign(admin));
+  res.set("Cache-Control","no-store");
+  res.json({ok:true,admin:safe(admin)});
+});
 app.post("/api/admin/logout",optionalAuth,async(req,res,next)=>{try{if(req.admin){req.admin.sessionVersion=Number(req.admin.sessionVersion||0)+1;await req.admin.save();}clearCookie(res);res.json({ok:true});}catch(e){next(e);}});
 app.get("/api/admin/me",auth,(req,res)=>res.json({admin:safe(req.admin)}));
 app.get("/api/admin/profile",auth,(req,res)=>res.json({admin:safe(req.admin)}));
@@ -295,9 +345,9 @@ app.patch("/api/admin/profile",auth,async(req,res,next)=>{
   if(invalidate)u.$inc={sessionVersion:1};
   const admin=await Admin.findByIdAndUpdate(req.admin._id,u,{new:true,runValidators:true});
   if(!admin)return res.status(404).json({message:"Admin profile not found"});
-  const token=sign(admin);
-  setCookie(res,token);
-  res.json({admin:safe(admin),token,reauthRequired:false});
+  setCookie(res,sign(admin));
+  res.set("Cache-Control","no-store");
+  res.json({ok:true,admin:safe(admin),reauthRequired:false});
  }catch(e){next(e)}
 });
 app.post("/api/admin/profile/upload",auth,upload.single("file"),async(req,res,next)=>{
