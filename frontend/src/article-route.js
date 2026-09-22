@@ -2,7 +2,7 @@
 // Keep the public /news/<slug-or-id> URL intact and let the article API
 // resolve the slug itself. This avoids an extra API read that would also
 // increment the article view counter before the real article load.
-const PREFIX = "/news/";
+const PREFIXES = ["/news/", "/n/"];
 const HASH_PREFIX = "#news-";
 const originalReplaceState = window.history.replaceState.bind(window.history);
 const originalPushState = window.history.pushState.bind(window.history);
@@ -14,7 +14,7 @@ function idFromPath(pathname = window.location.pathname) {
 }
 
 function pathForId(id) {
-  return `${PREFIX}${encodeURIComponent(String(id))}`;
+  return `/n/${encodeURIComponent(String(id))}`;
 }
 
 function bridgeUrl(original, state, title, url) {
@@ -51,7 +51,7 @@ function bootstrapArticlePath() {
   const timer = window.setInterval(() => {
     attempts += 1;
     const mounted = document.querySelector(".article-modal");
-    const stillOnArticle = window.location.pathname.startsWith(PREFIX);
+    const stillOnArticle = PREFIXES.some(p => window.location.pathname.startsWith(p));
     if (!stillOnArticle || mounted || attempts >= 40) {
       window.clearInterval(timer);
       if (stillOnArticle && window.location.hash.startsWith(HASH_PREFIX)) {
