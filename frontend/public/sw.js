@@ -41,25 +41,51 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname === "/admin" || url.pathname.startsWith("/admin/") || url.pathname.startsWith("/api/")) return;
 
-  event.respondWith(
-    fetch(event.request, { cache: "no-store" })
-      .then((response) => {
-        if (!response || !response.ok) return response;
-        if (event.request.mode === "navigate") {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put("/index.html", copy)).catch(() => {});
-        } else if (url.pathname.startsWith("/assets/") || url.pathname.endsWith(".css") || url.pathname.endsWith(".js") || url.pathname.endsWith(".svg")) {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => {});
-        }
-        return response;
+  const isStatic =
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.endsWith(".css") ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".svg") ||
+    url.pathname.endsWith(".png") ||
+    url.pathname.endsWith(".webp") ||
+    url.pathname.endsWith(".avif") ||
+    url.pathname.endsWith(".ico") ||
+    url.pathname.endsWith(".woff2");
+
+  if (isStatic) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => {
+        const network = fetch(event.request)
+          .then((response) => {
+            if (response && response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => {});
+            }
+            return response;
+          })
+          .catch(() => cached || new Response("Offline", { status: 503, statusText: "Offline" }));
+        return cached || network;
       })
-      .catch(() => caches.match(event.request).then((cached) => {
-        if (cached) return cached;
-        if (event.request.mode === "navigate") return caches.match("/index.html");
-        return new Response("Offline", { status: 503, statusText: "Offline" });
-      }))
-  );
+    );
+    return;
+  }
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      caches.match("/index.html").then((cached) => {
+        const network = fetch(event.request)
+          .then((response) => {
+            if (response && response.ok) {
+              const copy = response.clone();
+              caches.open(CACHE).then((cache) => cache.put("/index.html", copy)).catch(() => {});
+            }
+            return response;
+          })
+          .catch(() => cached || new Response("Offline", { status: 503, statusText: "Offline" }));
+        return cached || network;
+      })
+    );
+  }
 });
 
 self.addEventListener("push", (event) => {
