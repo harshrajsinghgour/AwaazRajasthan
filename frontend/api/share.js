@@ -13,7 +13,9 @@ export default async function handler(req,res){
     const payload=await api.json();const n=payload.news||payload.data||{};
     const title=clean(n.title)||"आवाज़ राजस्थान | Rajasthan News";
     const description=(clean(n.excerpt)||clean(n.content)||"राजस्थान की ताज़ा, स्थानीय और जरूरी खबरें।").slice(0,300);
-    const raw=imageFrom(n.image);const image=raw?new URL(raw,origin).href:new URL("/og-default.svg",origin).href;\n    const videoRaw=imageFrom(n.video || n.videoUrl || n.mediaVideo);const video=videoRaw?new URL(videoRaw,origin).href:"";\n    const canonical=origin+"/news/"+encodeURIComponent(slug);
+    const raw=imageFrom(n.image);const image=raw?new URL(raw,origin).href:new URL("/og-default.svg",origin).href;
+    const videoRaw=imageFrom(n.video || n.videoUrl || n.mediaVideo);const video=videoRaw?new URL(videoRaw,origin).href:"";
+    const canonical=origin+"/news/"+encodeURIComponent(slug);
     const baseHtml=await (await fetch(origin+"/index.html",{cache:"no-store"})).text();
     const remove=/<meta[^>]+(?:name|property)=["'](?:description|og:[^"']+|twitter:[^"']+|article:[^"']+)["'][^>]*>/gi;
     let out=baseHtml.replace(remove,"").replace(/<title>[\s\S]*?<\/title>/i,"");
