@@ -205,7 +205,7 @@ async function storeUploadedFile(file,folder){
   // Streaming a consumed file can turn transient B2/network timeouts into non-retryable failures.
   const body=await fs.promises.readFile(file.path);
   let lastError=null;
-  for(let attempt=1;attempt<=3;attempt+=1){
+  for(let attempt=1;attempt<=5;attempt+=1){
    try{
     await b2.send(new PutObjectCommand({
      Bucket:B2_BUCKET_NAME,
@@ -220,7 +220,7 @@ async function storeUploadedFile(file,folder){
     lastError=error;
     const code=String(error?.name||error?.Code||"");
     console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
-    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,700*attempt));
+    if(attempt<5) await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt-1)));
    }
   }
   if(lastError) throw lastError;
