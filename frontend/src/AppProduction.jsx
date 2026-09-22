@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const API_BASE = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "")
   : "";
-const PRODUCTION_API_FALLBACK = "https://awaazrajasthan.onrender.com";
 const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
 const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 
@@ -97,7 +96,7 @@ function NewsImage({ item, className = "" }) {
   useEffect(()=>{setIndex(0);setSrc(safeImage(images[0]||""));},[item?.id]);
   const raw=images[index]||images[0]||"";
   useEffect(()=>{setSrc(safeImage(raw));},[raw]);
-  function handleError(){ if(src.startsWith("/api/media/")) setSrc(PRODUCTION_API_FALLBACK+src); else setSrc("/news-placeholder.svg"); }
+  function handleError(){ setSrc("/news-placeholder.svg"); }
   return <div className={`news-media-frame ${className}`}>
     <img className="news-media-image" src={src||"/news-placeholder.svg"} alt={item?.title||"खबर"} loading="lazy" decoding="async" onError={handleError} />
     {images.length>1 && <div className="news-photo-badge">📷 {index+1}/{images.length}</div>}
@@ -345,7 +344,7 @@ export default function AppProduction() {
       if (query.trim()) params.set("q", query.trim());
       const path = `/api/news?${params.toString()}`;
       const load = async () => {
-        const targets = import.meta.env.DEV ? [`${API_BASE}${path}`] : [path, `${PRODUCTION_API_FALLBACK}${path}`];
+        const targets = [`${API_BASE}${path}`];
         let lastError = null;
         for (const target of targets) {
           for (let attempt = 0; attempt < 2; attempt += 1) {
