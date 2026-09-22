@@ -56,7 +56,10 @@
     {
       "source": "/index.html",
       "headers": [
-        {"key":"Cache-Control","value":"public, max-age=60, stale-while-revalidate=300"}
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=60, stale-while-revalidate=300"
+        }
       ]
     },
     {
@@ -103,29 +106,30 @@
       ]
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "^/admin/?$",
-      "dest": "/admin/index.html"
+      "source": "/admin",
+      "destination": "/admin/index.html"
     },
     {
-      "handle": "filesystem"
+      "source": "/admin/:path*",
+      "destination": "/admin/:path*"
     },
     {
-      "src": "^/api/(.*)$",
-      "dest": "https://awaazrajasthan.onrender.com/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://awaazrajasthan.onrender.com/api/:path*"
     },
     {
-      "src": "^/sitemap\\.xml$",
-      "dest": "https://awaazrajasthan.onrender.com/api/sitemap.xml"
+      "source": "/sitemap.xml",
+      "destination": "https://awaazrajasthan.onrender.com/api/sitemap.xml"
     },
     {
-      "src": "^/news/(.*)$",
-      "dest": "/index.html"
+      "source": "/news/:path*",
+      "destination": "/index.html"
     },
     {
-      "src": "^/(.*)$",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
