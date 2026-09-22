@@ -93,13 +93,15 @@ useEffect(() => { let cancelled = false; fetch(`${API_BASE}/api/ads?position=${e
 function NewsImage({ item, className = "" }) {
   const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[];
   const [index,setIndex]=useState(0);
-  const [failed,setFailed]=useState(false);
-  useEffect(()=>setIndex(0),[item?.id]);
-  const src=images[index]||images[0]||"";
+  const [src,setSrc]=useState("");
+  useEffect(()=>{setIndex(0);setSrc(safeImage(images[0]||""));},[item?.id]);
+  const raw=images[index]||images[0]||"";
+  useEffect(()=>{setSrc(safeImage(raw));},[raw]);
+  function handleError(){ if(src.startsWith("/api/media/")) setSrc(PRODUCTION_API_FALLBACK+src); else setSrc("/news-placeholder.svg"); }
   return <div className={`news-media-frame ${className}`}>
-    <img className="news-media-image" src={failed||!src?"/news-placeholder.svg":safeImage(src)} alt={item?.title||"खबर"} loading="lazy" decoding="async" onError={()=>setFailed(true)} />
+    <img className="news-media-image" src={src||"/news-placeholder.svg"} alt={item?.title||"खबर"} loading="lazy" decoding="async" onError={handleError} />
     {images.length>1 && <div className="news-photo-badge">📷 {index+1}/{images.length}</div>}
-    {images.length>1 && <div className="news-photo-dots" aria-label="फोटो बदलें">{images.map((_,i)=><button key={i} type="button" className={i===index?"active":""} aria-label={`फोटो ${i+1}`} onClick={e=>{e.stopPropagation();setFailed(false);setIndex(i);}} />)}</div>}
+    {images.length>1 && <div className="news-photo-dots" aria-label="फोटो बदलें">{images.map((_,i)=><button key={i} type="button" className={i===index?"active":""} aria-label={`फोटो ${i+1}`} onClick={e=>{e.stopPropagation();setIndex(i);}} />)}</div>}
     {item?.video && <span className="news-video-badge">▶ वीडियो</span>}
   </div>;
 }
