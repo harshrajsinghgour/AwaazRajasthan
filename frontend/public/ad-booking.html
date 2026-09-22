@@ -38,11 +38,24 @@
 </main>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-const API="https://awaazrajasthan.onrender.com";
+const API="";
 let options=[],booking=null;
 const $=id=>document.getElementById(id);
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
-async function api(path,opts={}){const r=await fetch(API+path,opts);let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Request failed");return d}
+async function api(path,opts={}){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),20000);
+  try{
+    const headers={"Accept":"application/json",...(opts.headers||{})};
+    const r=await fetch(API+path,{credentials:"same-origin",cache:"no-store",...opts,headers,signal:opts.signal||controller.signal});
+    let d={};try{d=await r.json()}catch{}
+    if(!r.ok)throw new Error(d.message||"Request failed");
+    return d;
+  }catch(e){
+    if(e?.name==="AbortError")throw new Error("Server response में ज्यादा समय लग रहा है। कृपया फिर कोशिश करें।");
+    throw e;
+  }finally{clearTimeout(timeout);}
+}
 async function init(){try{const d=await api("/api/ad-bookings/options");options=d.positions||[];$("priceList").innerHTML=options.map(x=>`<div style="padding:12px 0;border-bottom:1px solid #e6e9ed"><div style="display:flex;justify-content:space-between;gap:12px"><span><b>${esc(x.label)}</b><small style="display:block;color:#68727c">${esc(x.description||"")}</small></span><span style="white-space:nowrap;text-align:right;color:#b01922;font-weight:800">📷 ₹${Number(x.imageRatePerDay||x.ratePerDay||0).toLocaleString("en-IN")}/day<br>🎥 ₹${Number(x.videoRatePerDay||0).toLocaleString("en-IN")}/day</span></div></div>`).join("");$("position").innerHTML=options.map(x=>'<option value="'+esc(x.position)+'">'+esc(x.label)+' — Photo ₹'+Number(x.imageRatePerDay||x.ratePerDay||0).toLocaleString("en-IN")+' · Video ₹'+Number(x.videoRatePerDay||0).toLocaleString("en-IN")+'/day</option>').join("");updateMediaFields();updatePrice();}catch(e){$("error").textContent=e.message}}
 function updateMediaFields(){const isVideo=$("mediaType").value==="video";$("imageUploadWrap").hidden=isVideo;$("videoUploadWrap").hidden=!isVideo;if(isVideo){$("imageFile").value="";}else{$("videoFile").value="";}}function updatePrice(){const p=options.find(x=>x.position===$("position").value),days=Math.max(1,Math.min(365,Number($("durationDays").value||1)));if(!p)return;const media=$("mediaType").value,imageRate=Number(p.imageRatePerDay||p.ratePerDay||0),videoRate=Number(p.videoRatePerDay||0),daily=media==="video"?videoRate:imageRate;$("days").textContent=days;$("rate").textContent="₹"+daily.toLocaleString("en-IN");$("amount").textContent="₹"+Number(days*daily).toLocaleString("en-IN")}
 ["position","mediaType","durationDays"].forEach(id=>$(id).addEventListener("change",()=>{if(id==="mediaType")updateMediaFields();updatePrice()}));
