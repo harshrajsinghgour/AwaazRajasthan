@@ -201,12 +201,34 @@ async function storeUploadedFile(file,folder){
  if(!B2_ENABLED) throw new Error("B2 durable storage is not configured");
  const key=b2ObjectKey(folder,file);
  try{
-  await b2.send(new PutObjectCommand({Bucket:B2_BUCKET_NAME,Key:key,Body:fs.createReadStream(file.path),ContentType:file.mimetype,CacheControl:"public, max-age=31536000, immutable"}));
+  // Read the temporary multipart file once so a retry can safely resend the body.
+  // Streaming a consumed file can turn transient B2/network timeouts into non-retryable failures.
+  const body=await fs.promises.readFile(file.path);
+  let lastError=null;
+  for(let attempt=1;attempt<=3;attempt+=1){
+   try{
+    await b2.send(new PutObjectCommand({
+     Bucket:B2_BUCKET_NAME,
+     Key:key,
+     Body:body,
+     ContentType:file.mimetype,
+     CacheControl:"public, max-age=31536000, immutable"
+    }));
+    lastError=null;
+    break;
+   }catch(error){
+    lastError=error;
+    const code=String(error?.name||error?.Code||"");
+    console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
+    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,700*attempt));
+   }
+  }
+  if(lastError) throw lastError;
  }catch(error){
   console.error("B2 upload failed:",error?.name||error?.Code||error?.message||error);
-  throw new Error("Media could not be stored in Backblaze B2");
+  throw new Error("Media could not be stored in Backblaze B2. Please retry the upload.");
  }finally{
-  try{fs.unlinkSync(file.path)}catch{}
+  try{await fs.promises.unlink(file.path)}catch{}
  }
  const relative="/api/media/"+key.split("/").map(encodeURIComponent).join("/");
  return {key,url:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
