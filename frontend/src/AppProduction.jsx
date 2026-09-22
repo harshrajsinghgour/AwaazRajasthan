@@ -42,7 +42,7 @@ function normalize(item, index = 0) {
     image: (Array.isArray(item?.image)?item.image:[item?.image || item?.imageUrl || item?.thumbnail || fallback.image]).map(mediaUrl).filter(Boolean), video: mediaUrl(item?.video || item?.videoUrl || item?.mediaVideo || ""),
     time: item?.publishedAt || item?.createdAt ? formatDate(item.publishedAt || item.createdAt) : item?.time || "अभी",
     location: item?.location || item?.city || "राजस्थान", author: item?.author || item?.reporter || "आवाज़ राजस्थान",
-    featured: Boolean(item?.featured), latest: item?.latest !== false, breaking: Boolean(item?.breaking), views: Number(item?.views || 0), slug: item?.slug || ""
+    featured: Boolean(item?.featured), latest: item?.latest !== false, breaking: Boolean(item?.breaking), views: Number(item?.views || 0), slug: item?.slug || "", shareCode: String(item?.shareCode || "")
   };
 }
 function formatDate(value) { try { const d = new Date(value); if (Number.isNaN(d.getTime())) return "अभी"; return d.toLocaleString("hi-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }); } catch { return "अभी"; } }
@@ -392,7 +392,7 @@ export default function AppProduction() {
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
     const hashMatch = window.location.hash.match(/^#news-(.+)$/);
-    const pathMatch = window.location.pathname.match(/^\/(?:news|n)\/([^/]+)\/?$/);
+    const pathMatch = window.location.pathname.match(/^\/(?:news|n|s)\/([^/]+)\/?$/);
     if (!hashMatch && !pathMatch) return;
     let id = (hashMatch || pathMatch)[1];
     try { id = decodeURIComponent(id); } catch {}
@@ -431,9 +431,9 @@ export default function AppProduction() {
 
   function selectCategory(value) { if (value === "सभी जिले") { setDistrictMenuOpen(true); setCategory("होम"); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(true); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); return; } setDistrictMenuOpen(false); setCategory(value); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(false); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function toggleSave(id) { const key = String(id); const exists = saved.includes(key); if (exists) { const nextSaved = saved.filter(x => String(x) !== key); const nextItems = savedItems.filter(x => String(x.id || x._id) !== key); setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव से हटाई गई"); } else { const item = news.find(n => String(n.id || n._id) === key) || (article && String(article.id || article._id) === key ? article : null); if (!item) return; const nextSaved = [key, ...saved.filter(x => String(x) !== key)]; const nextItems = [item, ...savedItems.filter(x => String(x.id || x._id) !== key)]; setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव हो गई"); } }
-  async function share(item) { const id = String(item?.id || item?._id || "").trim(); if (!id) return; const url = `${window.location.origin}/n/${encodeURIComponent(id)}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt || "आवाज़ राजस्थान की खबर", url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
+  async function share(item) { const id = String(item?.id || item?._id || "").trim(); if (!id) return; const code = String(item?.shareCode || "").trim(); const url = `${window.location.origin}/s/${encodeURIComponent(code || id)}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt || "आवाज़ राजस्थान की खबर", url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
   async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
-  function closeArticle() { setArticle(null); const target = /^\/(?:news|n)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  function closeArticle() { setArticle(null); const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
 
   async function enableNotifications() {
     if (!window.isSecureContext && location.hostname !== "localhost") { setNotifyState("error"); setToast("नोटिफिकेशन के लिए HTTPS जरूरी है।"); return; }
