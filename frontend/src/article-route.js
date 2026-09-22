@@ -2,7 +2,7 @@
 // Keep the public /news/<slug-or-id> URL intact and let the article API
 // resolve the slug itself. This avoids an extra API read that would also
 // increment the article view counter before the real article load.
-const PREFIXES = ["/news/", "/n/"];
+const PREFIXES = ["/news/", "/n/", "/s/"];
 const HASH_PREFIX = "#news-";
 const originalReplaceState = window.history.replaceState.bind(window.history);
 const originalPushState = window.history.pushState.bind(window.history);
