@@ -16,11 +16,15 @@
     },
     {
       "source": "/news/:path*",
-      "destination": "/api/n/:path*"
+      "destination": "/api/share?slug=:path*"
     },
     {
       "source": "/n/:path*",
       "destination": "/api/share?slug=:path*"
+    },
+    {
+      "source": "/s/:path*",
+      "destination": "/api/s/:path*"
     },
     {
       "source": "/:path*",
