@@ -27,3 +27,8 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media(min-width:768px){.mobile-bottom-nav{display:none!important}.article-modal{min-height:100vh}}
 html[data-theme=dark] body{background:#07111c}html[data-theme=dark] .site-header,html[data-theme=dark] .hero-card,html[data-theme=dark] .compact-card,html[data-theme=dark] .latest-section,html[data-theme=dark] .side-card,html[data-theme=dark] .district-section,html[data-theme=dark] .quick-tools>*,html[data-theme=dark] .article-modal{background:#0d1b2a;color:#e7edf4;border-color:#1f3345}html[data-theme=dark] .brand strong,html[data-theme=dark] .welcome-row h1,html[data-theme=dark] .section-heading h2,html[data-theme=dark] .side-title h3,html[data-theme=dark] .trend-item span,html[data-theme=dark] .news-row h3{color:#f5f7fa}html[data-theme=dark] .news-row p,html[data-theme=dark] .welcome-row p:not(.eyebrow),html[data-theme=dark] .count{color:#aab8c6}html[data-theme=dark] .district-grid button,html[data-theme=dark] .district-select select{background:#122438;color:#e7edf4;border-color:#294158}html[data-theme=dark] .mobile-bottom-nav{background:rgba(10,24,38,.96);border-color:#203448}
+
+/* Multi-photo news gallery */
+.news-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0 4px}
+.news-gallery img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;border:1px solid var(--wa-line,#e7e9ee);background:#eee;display:block}
+@media(min-width:768px){.news-gallery{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
