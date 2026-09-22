@@ -29,7 +29,7 @@ jobs:
         run: npm run build
       - name: Validate Vercel configuration
         working-directory: .
-        run: node -e "const fs=require('fs'); const v=JSON.parse(fs.readFileSync('frontend/vercel.json','utf8')); if(!Array.isArray(v.rewrites)||!Array.isArray(v.headers)) throw new Error('Invalid frontend/vercel.json'); if(!v.rewrites.some(x=>x.source==='/news/:id*'&&x.destination==='/index.html')) throw new Error('Article rewrite missing'); console.log('Vercel configuration OK')"
+        run: node -e "const fs=require('fs'); const v=JSON.parse(fs.readFileSync('frontend/vercel.json','utf8')); if(!Array.isArray(v.rewrites)||!Array.isArray(v.headers)) throw new Error('Invalid frontend/vercel.json'); if(!v.rewrites.some(x=>x.source==='/news/:path*'&&x.destination==='/index.html')) throw new Error('Article rewrite missing'); console.log('Vercel configuration OK')"
       - name: Validate frontend production contracts
         working-directory: .
         run: |
@@ -96,7 +96,8 @@ jobs:
       - name: Validate production security contracts
         run: |
           grep -n 'if(PROD&&!JWT_SECRET)' server.production.js
-          grep -n 'app.post("/api/admin/login",rateLimit' server.production.js
+          grep -n 'const adminLoginIpLimiter=rateLimit' server.production.js
+          grep -n 'app.post("/api/admin/login",adminLoginIpLimiter,adminLoginEmailLimiter' server.production.js
           grep -n 'ownerOnly' server.production.js
           grep -n 'api/admin/ads' server.production.js
           grep -n 'api/admin/ad-prices' server.production.js
