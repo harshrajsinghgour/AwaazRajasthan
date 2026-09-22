@@ -21,7 +21,7 @@
       ]
     },
     {
-      "source": "/api/news/(.*)",
+      "source": "/api/news/:path*",
       "headers": [
         {
           "key": "Cache-Control",
@@ -47,7 +47,7 @@
       ]
     },
     {
-      "source": "/admin/(.*)",
+      "source": "/admin/:path*",
       "headers": [
         {
           "key": "Cache-Control",
@@ -64,7 +64,7 @@
       ]
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "headers": [
         {
           "key": "X-Content-Type-Options",
@@ -89,7 +89,7 @@
       ]
     }
     {
-      "source": "/assets/(.*)",
+      "source": "/assets/:path*",
       "headers": [
         {
           "key": "Cache-Control",
@@ -115,7 +115,7 @@
       ]
     },
     {
-      "source": "/admin/(.*)",
+      "source": "/admin/:path*",
       "headers": [
         {
           "key": "Cache-Control",
@@ -150,7 +150,7 @@
       "destination": "/index.html"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]
