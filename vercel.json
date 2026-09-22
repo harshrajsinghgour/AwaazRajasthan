@@ -20,6 +20,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/n/:path*",
+      "destination": "/api/share?slug=:path*"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }
