@@ -306,19 +306,42 @@ export default function AppProduction() {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
+    setLoading(true);
     const timer = setTimeout(() => {
-      const params = new URLSearchParams({ limit: "100" });
+      const params = new URLSearchParams({ limit: "100", _t: String(Date.now()) });
       if (category !== "होम") params.set("category", category);
       if (district) params.set("location", district);
       if (query.trim()) params.set("q", query.trim());
-      fetch(`${API_BASE}/api/news?${params.toString()}`, { headers: { Accept: "application/json" }, signal: controller.signal })
-        .then(r => r.ok ? r.json() : Promise.reject())
+      const url = `${API_BASE}/api/news?${params.toString()}`;
+      const load = async () => {
+        let lastError = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          if (controller.signal.aborted) throw new DOMException("Request aborted", "AbortError");
+          try {
+            const response = await fetch(url, {
+              headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+              cache: "no-store",
+              signal: controller.signal
+            });
+            if (!response.ok) throw new Error(`News API HTTP ${response.status}`);
+            return await response.json();
+          } catch (error) {
+            lastError = error;
+            if (controller.signal.aborted || attempt === 2) throw lastError;
+            await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+          }
+        }
+        throw lastError || new Error("News API unavailable");
+      };
+      load()
         .then(data => {
           const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
           if (!cancelled) setNews(Array.isArray(list) ? list.map(normalize) : []);
         })
-        .catch(() => {})
+        .catch(error => {
+          if (!cancelled && error?.name !== "AbortError") console.warn("NEWS_FEED_LOAD_FAILED", error);
+        })
         .finally(() => { if (!cancelled) setLoading(false); });
     }, query.trim() ? 350 : 0);
     return () => { cancelled = true; clearTimeout(timer); clearTimeout(timeoutId); controller.abort(); };
