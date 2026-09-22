@@ -236,7 +236,7 @@ function EpaperPage() {
 
 export default function AppProduction() {
   if(window.location.pathname==="/epaper") return <EpaperPage />;
-  const [news, setNews] = useState(FALLBACK), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false);
+  const [news, setNews] = useState(FALLBACK), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
   const [saved, setSaved] = useState(() => {
     try {
       const bookmarks = readStorageJson("awaaz-bookmarks", []).map(x => String(x)).filter(Boolean);
@@ -345,7 +345,18 @@ export default function AppProduction() {
         .finally(() => { if (!cancelled) setLoading(false); });
     }, query.trim() ? 350 : 0);
     return () => { cancelled = true; clearTimeout(timer); clearTimeout(timeoutId); controller.abort(); };
-  }, [category, district, query]);
+  }, [category, district, query, newsRefreshKey]);
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") setNewsRefreshKey(value => value + 1); };
+    const interval = window.setInterval(refresh, 30000);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
   useEffect(() => { writeStorage("awaaz-bookmarks", JSON.stringify(saved)); writeStorage("awaaz-saved-news", JSON.stringify(savedItems)); }, [saved, savedItems]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
@@ -380,7 +391,7 @@ export default function AppProduction() {
       const categoryMatch = category === "होम" || n.category === category || n.location === category;
       const districtMatch = !district || n.location === district || n.category === district || `${n.title} ${n.excerpt}`.includes(district);
       const textMatch = !q || [n.title,n.excerpt,n.category,n.location,n.author].join(" ").toLowerCase().includes(q);
-      const feedMatch = feedType === "latest" ? n.latest !== false : feedType === "breaking" ? Boolean(n.breaking) : feedType === "video" ? Boolean(n.video) : feedType === "photo" ? Boolean(n.image) : true;
+      const feedMatch = feedType === "latest" ? (category === "होम" ? true : n.latest !== false) : feedType === "breaking" ? Boolean(n.breaking) : feedType === "video" ? Boolean(n.video) : feedType === "photo" ? Boolean(n.image) : true;
       return categoryMatch && districtMatch && textMatch && feedMatch;
     });
   }, [news, savedItems, category, district, query, savedOnly, feedType]);
