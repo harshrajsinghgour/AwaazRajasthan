@@ -21,7 +21,7 @@
     },
     {
       "source": "/n/:path*",
-      "destination": "/api/share?slug=:path*"
+      "destination": "/api/n/:path*"
     },
     {
       "source": "/:path*",
