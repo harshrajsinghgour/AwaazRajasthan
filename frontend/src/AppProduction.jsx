@@ -1,6 +1,9 @@
 // Production build stabilization
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+function shortCodeFromId(id){try{const hex=String(id||"").trim();if(!/^[a-fA-F0-9]{24}$/.test(hex))return "";let bin="";for(let i=0;i<24;i+=2)bin+=String.fromCharCode(parseInt(hex.slice(i,i+2),16));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}catch{return "";}}
+function idFromShortCode(code){try{const s=String(code||"").replace(/-/g,"+").replace(/_/g,"/");const bin=atob(s);if(bin.length!==12)return "";let hex="";for(let i=0;i<bin.length;i++)hex+=bin.charCodeAt(i).toString(16).padStart(2,"0");return /^[a-fA-F0-9]{24}$/.test(hex)?hex:"";}catch{return "";}}
+
 const API_BASE = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "")
   : "";
@@ -396,6 +399,7 @@ export default function AppProduction() {
     if (!hashMatch && !pathMatch) return;
     let id = (hashMatch || pathMatch)[1];
     try { id = decodeURIComponent(id); } catch {}
+    if (!hashMatch && window.location.pathname.startsWith("/s/")) id = idFromShortCode(id) || id;
     const found = news.find(n => String(n.id) === id || String(n.slug || "") === id);
     if (found) {
       openArticle(found, false);
@@ -431,7 +435,7 @@ export default function AppProduction() {
 
   function selectCategory(value) { if (value === "सभी जिले") { setDistrictMenuOpen(true); setCategory("होम"); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(true); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); return; } setDistrictMenuOpen(false); setCategory(value); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(false); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function toggleSave(id) { const key = String(id); const exists = saved.includes(key); if (exists) { const nextSaved = saved.filter(x => String(x) !== key); const nextItems = savedItems.filter(x => String(x.id || x._id) !== key); setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव से हटाई गई"); } else { const item = news.find(n => String(n.id || n._id) === key) || (article && String(article.id || article._id) === key ? article : null); if (!item) return; const nextSaved = [key, ...saved.filter(x => String(x) !== key)]; const nextItems = [item, ...savedItems.filter(x => String(x.id || x._id) !== key)]; setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव हो गई"); } }
-  async function share(item) { const id = String(item?.id || item?._id || "").trim(); if (!id) return; const code = String(item?.shareCode || "").trim(); const url = `${window.location.origin}/s/${encodeURIComponent(code || id)}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt || "आवाज़ राजस्थान की खबर", url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
+  async function share(item) { const id = String(item?.id || item?._id || "").trim(); if (!id) return; const code = String(item?.shareCode || shortCodeFromId(id) || "").trim(); const url = `${window.location.origin}/s/${encodeURIComponent(code || id)}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt || "आवाज़ राजस्थान की खबर", url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
   async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
   function closeArticle() { setArticle(null); const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
 
