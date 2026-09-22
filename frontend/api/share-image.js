@@ -21,10 +21,10 @@ export default async function handler(req,res){
     if(!raw)return res.status(404).end();
     const media=raw.startsWith("/")?apiBase+raw:raw;
     const img=await fetch(media,{headers:{accept:"image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"}});
-    if(!img.ok||!img.body)return res.status(img.status||404).end();
+    if(!img.ok)return res.status(img.status||404).end();
     res.setHeader("Content-Type",img.headers.get("content-type")||"image/jpeg");
     res.setHeader("Cache-Control","public, s-maxage=86400, stale-while-revalidate=604800");
     const len=img.headers.get("content-length"); if(len)res.setHeader("Content-Length",len);
-    return img.body.pipeTo(new WritableStream({write(chunk){res.write(Buffer.from(chunk));},close(){res.end();},abort(){res.end();}}));
+    const body=Buffer.from(await img.arrayBuffer());\n    return res.status(200).send(body);
   }catch(e){console.error("share image error",e);return res.status(404).end();}
 }
