@@ -368,7 +368,7 @@ export default function AppProduction() {
       load()
         .then(data => {
           const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
-          if (!cancelled) setNews(Array.isArray(list) ? list.map(normalize) : []);
+          if (!cancelled && Array.isArray(list)) { const normalized=list.map(normalize); setNews(prev => normalized.length ? normalized : prev); }
         })
         .catch(error => {
           if (!cancelled && error?.name !== "AbortError") console.warn("NEWS_FEED_LOAD_FAILED", error);
