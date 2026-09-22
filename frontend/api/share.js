@@ -7,7 +7,8 @@ export default async function handler(req,res){
   const esc=(v)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
   const imageFrom=(v)=>{if(typeof v==="string")return v.trim();if(Array.isArray(v)){for(let i=v.length-1;i>=0;i--){const x=imageFrom(v[i]);if(x)return x;}return "";}if(v&&typeof v==="object"){for(const k of ["url","src","secure_url","publicUrl","image","original","large"]){if(v[k]){const x=imageFrom(v[k]);if(x)return x;}}}return "";};
   try{
-    const api=await fetch(apiBase+"/api/news/"+encodeURIComponent(slug)+"/preview",{headers:{accept:"application/json"}});
+    let api=await fetch(apiBase+"/api/news/"+encodeURIComponent(slug)+"/preview",{headers:{accept:"application/json"}});
+    if(!api.ok) api=await fetch(apiBase+"/api/news/"+encodeURIComponent(slug),{headers:{accept:"application/json"}});
     if(!api.ok)return res.status(api.status).send("News not found");
     const payload=await api.json();const n=payload.news||payload.data||{};
     const title=clean(n.title)||"आवाज़ राजस्थान | Rajasthan News";
