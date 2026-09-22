@@ -112,10 +112,6 @@
       "destination": "/admin/index.html"
     },
     {
-      "source": "/admin/:path*",
-      "destination": "/admin/:path*"
-    },
-    {
       "source": "/api/:path*",
       "destination": "https://awaazrajasthan.onrender.com/api/:path*"
     },
