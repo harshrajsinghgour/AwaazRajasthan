@@ -13,13 +13,17 @@ let me=null,news=[],ads=[],admins=[];
 const DEFAULT_API_BASE="http://localhost:5000";
 function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?DEFAULT_API_BASE:"";}
 function setApiBase(){return getApiBase();}
-function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");}catch{}try{localStorage.removeItem("awaaz_admin_token");}catch{}}
+function getAdminToken(){try{return sessionStorage.getItem("awaaz_admin_session")||""}catch{return""}}
+function setAdminToken(token){try{if(token)sessionStorage.setItem("awaaz_admin_session",String(token));else sessionStorage.removeItem("awaaz_admin_session")}catch{}}
+function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");sessionStorage.removeItem("awaaz_admin_session");}catch{}try{localStorage.removeItem("awaaz_admin_token");localStorage.removeItem("awaaz_admin_session");}catch{}}
 function initApiBase(){}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function api(path,options={},attempt=0){
  const base=getApiBase();
  const opts={credentials:"include",cache:"no-store",...options};
  opts.headers={"Content-Type":"application/json",...(options.headers||{})};
+ const sessionToken=getAdminToken();
+ if(sessionToken&&!opts.headers.Authorization)opts.headers.Authorization="Bearer "+sessionToken;
  const controller=new AbortController();
  const timeout=setTimeout(()=>controller.abort(),20000);
  if(!opts.signal)opts.signal=controller.signal;
@@ -50,7 +54,6 @@ function updateNewsPlacement(){const c=$("newsCategory")?.value||"",l=$("newsLoc
 function previewMedia(inputId,urlId,boxId){const box=$(boxId);if(!box)return;const file=$(inputId)?.files?.[0],url=$(urlId)?.value?.trim()||"";if(!file&&!url){box.classList.add("hidden");box.innerHTML="";return;}const src=file?URL.createObjectURL(file):url;const isVideo=file?String(file.type||"").startsWith("video/"):/\.(mp4|webm|ogg)(\?|#|$)/i.test(url);box.innerHTML=isVideo?`<video src="${esc(src)}" controls muted playsinline></video>`:`<img src="${esc(src)}" alt="Media preview">`;box.classList.remove("hidden");}
 async function boot(){
  initApiBase();
- clearLegacyAdminToken();
  try{
   const session=await api("/api/admin/me");
   if(!session?.admin)throw new Error("No active admin session");
@@ -93,9 +96,8 @@ const handleLogin=async e=>{
  status.textContent="Login हो रहा है…";
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
  try{
-  await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
-  // Never trust the login response alone: the browser must be able to use the
-  // secure HttpOnly session cookie immediately after login.
+  const loginResponse=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
+  if(loginResponse?.token)setAdminToken(loginResponse.token);
   const session=await api("/api/admin/me");
   if(!session?.admin)throw new Error("Secure admin session verify नहीं हो पाई। कृपया फिर से Login करें।");
   me=session.admin;
@@ -196,7 +198,7 @@ $("bookingStatusFilter")?.addEventListener("change",loadAdBookings);
 async function loadProfile(){try{const r=await api("/api/admin/profile"),a=r.admin||{};$("profileEmail").value=a.email||"";$("profilePassword").value="";$("profileAvatar").value=a.avatar||"";const box=$("profileAvatarPreview");if(box){if(a.avatar){box.innerHTML='<img src="'+esc(a.avatar)+'" alt="Profile photo preview">';box.classList.remove("hidden")}else{box.classList.add("hidden");box.innerHTML=""}}}catch(e){toast(e.message)}}
 async function uploadProfilePhoto(file){if(!file)return "";if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP या GIF photo चुनें");const form=new FormData();form.append("file",file);const headers={};const r=await fetch(getApiBase()+"/api/admin/profile/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Profile photo upload failed");return d.url||d.relativeUrl||"";}
 $("profileAvatarFile")?.addEventListener("change",async()=>{const file=$("profileAvatarFile").files?.[0];if(!file)return;try{const box=$("profileAvatarPreview");box.innerHTML='<img src="'+esc(URL.createObjectURL(file))+'" alt="Profile photo preview">';box.classList.remove("hidden")}catch{}});
-$("profileForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter||$("profileForm").querySelector("button[type=submit]");if(btn)btn.disabled=true;try{const currentEmail=String(me?.email||"").trim().toLowerCase();const email=$("profileEmail").value.trim().toLowerCase();let avatar=$("profileAvatar").value.trim();const file=$("profileAvatarFile").files?.[0];if(file){toast("Profile photo upload हो रही है…");avatar=await uploadProfilePhoto(file);$("profileAvatar").value=avatar;}const body={};if(email&&email!==currentEmail)body.email=email;const currentAvatar=String(me?.avatar||"").trim();if(avatar!==currentAvatar)body.avatar=avatar;const password=$("profilePassword").value;if(password)body.password=password;if(!Object.keys(body).length){toast("कोई बदलाव नहीं किया गया।");return;}const r=await api("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});me=r.admin||me;toast("Profile successfully updated");$("profilePassword").value="";$("profileAvatarFile").value="";await loadProfile();applyPermissionUI();}catch(err){toast(err.message)}finally{if(btn)btn.disabled=false;}});
+$("profileForm")?.addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter||$("profileForm").querySelector("button[type=submit]");if(btn)btn.disabled=true;try{const currentEmail=String(me?.email||"").trim().toLowerCase();const email=$("profileEmail").value.trim().toLowerCase();let avatar=$("profileAvatar").value.trim();const file=$("profileAvatarFile").files?.[0];if(file){toast("Profile photo upload हो रही है…");avatar=await uploadProfilePhoto(file);$("profileAvatar").value=avatar;}const body={};if(email&&email!==currentEmail)body.email=email;const currentAvatar=String(me?.avatar||"").trim();if(avatar!==currentAvatar)body.avatar=avatar;const password=$("profilePassword").value;if(password)body.password=password;if(!Object.keys(body).length){toast("कोई बदलाव नहीं किया गया।");return;}const r=await api("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});if(r?.token)setAdminToken(r.token);me=r.admin||me;toast("Profile successfully updated");$("profilePassword").value="";$("profileAvatarFile").value="";await loadProfile();applyPermissionUI();}catch(err){toast(err.message)}finally{if(btn)btn.disabled=false;}});
 async function loadAll(){const tasks=[];if(hasPermission("news:read")||hasPermission("news:write")||hasPermission("news:delete")){tasks.push(refreshCategories());if(hasPermission("news:read"))tasks.push(loadNews())}if(me?.role==="owner"){tasks.push(loadAds(),loadAdBookings(),loadAdFees(),loadAdPrices(),loadAdmins(),loadOtpAdmins(),loadNotificationStatus(),loadCategories(),loadHomeButtons(),loadLegal(),loadEpapers())}const results=await Promise.allSettled([loadDashboard(),...tasks]);const failed=results.filter(x=>x.status==="rejected");if(failed.length)toast(failed.length+" section का data load नहीं हुआ — संबंधित tab में Refresh करें।");}
 async function uploadEpaper(file){if(!file||file.type!=="application/pdf")throw new Error("केवल PDF ई-पेपर चुनें।");const base=getApiBase(),form=new FormData();form.append("file",file);const headers={};const r=await fetch(base+"/api/admin/epapers/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"E-paper upload failed");return d.url||d.pdf;}
 async function loadEpapers(){if(me?.role!=="owner")return;try{const r=await api("/api/admin/epapers");const items=Array.isArray(r.epapers)?r.epapers:(Array.isArray(r.data)?r.data:[]);$("epaperList").innerHTML=items.map(x=>'<div class="list-row"><div><b>'+esc(x.title||"ई-पेपर")+'</b><small>'+esc(formatDate(x.issueDate))+' · '+esc(x.status)+'</small></div><div><button onclick="window.open('+JSON.stringify(x.pdf.startsWith("http")?x.pdf:getApiBase()+x.pdf)+',"_blank")">Open PDF</button><button class="danger" onclick="deleteEpaper(this.dataset.id)" data-id="'+esc(x._id)+'">Delete</button></div></div>').join("")||"<p>अभी कोई ई-पेपर upload नहीं है।</p>"}catch(e){$("epaperList").innerHTML="<p>"+esc(e.message)+"</p>"}}
