@@ -11,7 +11,6 @@ function fillAssignmentSelects(selectedCategories=[],selectedDistricts=[]){
 function selectedAssignmentValues(id){return [...($(id)?.selectedOptions||[])].map(o=>o.value);}
 let me=null,news=[],ads=[],admins=[];
 let newsExistingImages=[];
-const DEFAULT_API_BASE="http://localhost:5000";
 function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?DEFAULT_API_BASE:"";}
 function setApiBase(){return getApiBase();}
 function getAdminToken(){try{return sessionStorage.getItem("awaaz_admin_session")||""}catch{return""}}
