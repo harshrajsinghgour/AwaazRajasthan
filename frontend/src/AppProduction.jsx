@@ -56,7 +56,7 @@ function mediaUrl(src) {
       const parsed = new URL(value);
       // Keep the Render backend hostname out of public media URLs. Existing
       // uploads may contain the old absolute URL; route them through Vercel.
-      if (parsed.hostname === "awaazrajasthan.onrender.com" && parsed.pathname.startsWith("/api/media/")) {
+      if ((parsed.hostname === "awaazrajasthan.onrender.com" || /(^|\\.)vercel\\.app$/i.test(parsed.hostname)) && parsed.pathname.startsWith("/api/media/")) {
         return parsed.pathname + parsed.search;
       }
     } catch {}
