@@ -165,10 +165,11 @@ async function sendAdminOtpEmail(to,name,otp){
 }
 const ADMIN_SESSION_TTL="30d";
 const ADMIN_COOKIE_MAX_AGE=30*24*60*60*1000;
+const DUMMY_ADMIN_PASSWORD_HASH="$2b$12$LQv3c1yqBWdHnW2p1VqQ.eW5fQJ4yJfH4p8n7q4Y4m3Jr7m8m9sW2";
 const sign=a=>jwt.sign({sub:String(a._id),role:a.role,email:a.email,sv:a.sessionVersion||0},JWT_SECRET||"development-secret",{expiresIn:ADMIN_SESSION_TTL});
 async function verifyAdminPassword(admin,password){
- if(!admin||typeof password!=="string"||!password)return false;
- const stored=String(admin.passwordHash||"").trim();
+ if(typeof password!=="string"||!password)return false;
+ const stored=String(admin?.passwordHash||DUMMY_ADMIN_PASSWORD_HASH).trim();
  if(!stored)return false;
  // All Owner/Admin accounts use the same password verification path.
  // Accept bcrypt hashes from every admin record and transparently migrate only legacy plaintext records.
@@ -301,7 +302,9 @@ app.post("/api/ads/:id/impression",adImpressionLimiter,async(req,res,next)=>{try
 app.post("/api/ads/:id/click",adClickLimiter,async(req,res,next)=>{try{if(!mongoose.isValidObjectId(req.params.id))return res.status(400).json({message:"Invalid ad id"});const ad=await Ad.findById(req.params.id).select("status startDate endDate").lean();if(!ad||!activeAd(ad))return res.status(404).json({message:"Ad not active"});await Ad.updateOne({_id:req.params.id},{$inc:{clicks:1}});res.status(204).end();}catch(e){next(e);}});
 async function deliverPushToActiveSubscribers({title,body,url="/",tagPrefix="awaaz-news"}){const VAPID_PUBLIC_KEY=cleanEnv(process.env.VAPID_PUBLIC_KEY),VAPID_PRIVATE_KEY=cleanEnv(process.env.VAPID_PRIVATE_KEY),VAPID_SUBJECT=cleanEnv(process.env.VAPID_SUBJECT);if(!VAPID_PUBLIC_KEY||!VAPID_PRIVATE_KEY||!VAPID_SUBJECT)return {configured:false,sent:0,removed:0,failed:0,total:0};webpush.setVapidDetails(VAPID_SUBJECT,VAPID_PUBLIC_KEY,VAPID_PRIVATE_KEY);const subscribers=await Subscriber.find({active:true}).select("subscription _id").lean();let sent=0,removed=0,failed=0;const payload=JSON.stringify({title:boundedText(title,120),body:boundedText(body,300),url,tag:`${tagPrefix}-${Date.now()}`,renotify:true});for(const row of subscribers){try{await webpush.sendNotification(row.subscription,payload);sent++;await Subscriber.updateOne({_id:row._id},{$set:{lastSuccessAt:new Date()}});}catch(error){if(error?.statusCode===404||error?.statusCode===410){await Subscriber.updateOne({_id:row._id},{$set:{active:false,lastFailureAt:new Date()}});removed++;}else{await Subscriber.updateOne({_id:row._id},{$set:{lastFailureAt:new Date()}});failed++;console.error("Push delivery failed:",error?.statusCode||error?.message||error);}}}return {configured:true,sent,removed,failed,total:subscribers.length};}
 app.post("/api/notifications/subscribe",subscriptionLimiter,async(req,res,next)=>{try{const body=req.body||{},endpoint=String(body.endpoint||"").trim();if(!endpoint||endpoint.length>2048||!isHttpsUrl(endpoint))return res.status(400).json({message:"Invalid subscription endpoint"});if(!body.keys||typeof body.keys!=="object"||Array.isArray(body.keys))return res.status(400).json({message:"Push subscription keys are required"});const p256dh=String(body.keys.p256dh||"").trim(),authKey=String(body.keys.auth||"").trim();if(!p256dh||p256dh.length>512||!authKey||authKey.length>512)return res.status(400).json({message:"Invalid push subscription keys"});if(body.expirationTime!==undefined&&body.expirationTime!==null&&(!Number.isFinite(Number(body.expirationTime))||Number(body.expirationTime)<0))return res.status(400).json({message:"Invalid subscription expiration"});await Subscriber.findOneAndUpdate({endpoint},{subscription:{...body,endpoint,keys:{p256dh,auth:authKey}},active:true},{upsert:true,new:true,setDefaultsOnInsert:true});res.status(201).json({ok:true});}catch(e){next(e);}});
-app.post("/api/admin/login",rateLimit({windowMs:10*60*1000,limit:10000,standardHeaders:"draft-8",legacyHeaders:false,keyGenerator:req=>String(req.body?.email||req.ip||"login").toLowerCase().trim()}),async(req,res,next)=>{
+const adminLoginIpLimiter=rateLimit({windowMs:10*60*1000,limit:120,standardHeaders:"draft-8",legacyHeaders:false});
+const adminLoginEmailLimiter=rateLimit({windowMs:10*60*1000,limit:60,standardHeaders:"draft-8",legacyHeaders:false,keyGenerator:req=>String(req.body?.email||"").toLowerCase().trim()||req.ip||"login"});
+app.post("/api/admin/login",adminLoginIpLimiter,adminLoginEmailLimiter,async(req,res,next)=>{
  try{
   const email=String(req.body?.email||"").toLowerCase().trim(),password=String(req.body?.password||"");
   if(!isValidEmail(email)||!password)return res.status(401).json({message:"ईमेल या पासवर्ड गलत है।"});
