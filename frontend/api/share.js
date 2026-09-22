@@ -1,11 +1,11 @@
 export default async function handler(req,res){
   const slug=String(req.query?.slug||"").split("/")[0];
   if(!slug)return res.status(400).send("Missing news slug");
-  const origin=new URL(req.url).origin;
+  const origin="https://"+String(req.headers.host||"awaazrajasthan.vercel.app").replace(/\/$/,"");
   const apiBase=String(process.env.PUBLIC_API_URL||"https://awaazrajasthan.onrender.com").replace(/\/$/,"");
   const clean=(v)=>String(v??"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim();
   const esc=(v)=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  const imageFrom=(v)=>{if(typeof v==="string")return v.trim();if(Array.isArray(v))return imageFrom(v[0]);if(v&&typeof v==="object"){for(const k of ["url","src","secure_url","publicUrl","image","original","large"]){if(v[k]){const x=imageFrom(v[k]);if(x)return x;}}}return "";};
+  const imageFrom=(v)=>{if(typeof v==="string")return v.trim();if(Array.isArray(v)){for(let i=v.length-1;i>=0;i--){const x=imageFrom(v[i]);if(x)return x;}return "";}if(v&&typeof v==="object"){for(const k of ["url","src","secure_url","publicUrl","image","original","large"]){if(v[k]){const x=imageFrom(v[k]);if(x)return x;}}}return "";};
   try{
     const api=await fetch(apiBase+"/api/news/"+encodeURIComponent(slug)+"/preview",{headers:{accept:"application/json"}});
     if(!api.ok)return res.status(api.status).send("News not found");
