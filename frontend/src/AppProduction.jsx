@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 const API_BASE = import.meta.env.DEV
   ? (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "")
   : "";
+const PRODUCTION_API_FALLBACK = "https://awaazrajasthan.onrender.com";
 const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
 const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
 
@@ -89,8 +90,24 @@ useEffect(() => { let cancelled = false; fetch(`${API_BASE}/api/ads?position=${e
   const image = mediaUrl(ad.image || ad.imageUrl || ad.banner); const video = mediaUrl(ad.video || ad.videoUrl || ""); const href = safeAdUrl(ad.link);
   return <a className={`ad-slot ad-live ${className}`} href={href} target="_blank" rel="noreferrer" onClick={() => fetch(`${API_BASE}/api/ads/${ad._id || ad.id}/click`, { method: "POST" }).catch(() => {})}>{video ? <video src={video} poster={image || undefined} controls muted playsInline preload="metadata" aria-label={ad.title || "विज्ञापन वीडियो"} /> : image ? <img src={image} alt={ad.title || "विज्ञापन"} /> : <span>{ad.title || "विज्ञापन"}</span>}</a>;
 }
-function NewsImage({ item, className = "" }) { const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[]; const [src,setSrc]=useState(safeImage(images[0])); return <img className={className} src={src} alt={item.title} loading="lazy" decoding="async" onError={() => setSrc("/news-placeholder.svg")} />; }
-function NewsGallery({ item }) { const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[]; if(images.length<2)return null; return <div className="news-gallery" aria-label="खबर की सभी तस्वीरें">{images.map((src,i)=><img key={src+"-"+i} src={safeImage(src)} alt={item.title+" — फोटो "+(i+1)} loading="lazy" decoding="async" onError={e=>{e.currentTarget.style.display="none";}} />)}</div>; }
+function NewsImage({ item, className = "" }) {
+  const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[];
+  const [index,setIndex]=useState(0);
+  const [failed,setFailed]=useState(false);
+  useEffect(()=>setIndex(0),[item?.id]);
+  const src=images[index]||images[0]||"";
+  return <div className={`news-media-frame ${className}`}>
+    <img className="news-media-image" src={failed||!src?"/news-placeholder.svg":safeImage(src)} alt={item?.title||"खबर"} loading="lazy" decoding="async" onError={()=>setFailed(true)} />
+    {images.length>1 && <div className="news-photo-badge">📷 {index+1}/{images.length}</div>}
+    {images.length>1 && <div className="news-photo-dots" aria-label="फोटो बदलें">{images.map((_,i)=><button key={i} type="button" className={i===index?"active":""} aria-label={`फोटो ${i+1}`} onClick={e=>{e.stopPropagation();setFailed(false);setIndex(i);}} />)}</div>}
+    {item?.video && <span className="news-video-badge">▶ वीडियो</span>}
+  </div>;
+}
+function NewsGallery({ item }) {
+  const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[];
+  if(images.length<2)return null;
+  return <div className="news-gallery" aria-label="खबर की सभी तस्वीरें">{images.map((src,i)=><img key={src+"-"+i} src={safeImage(src)} alt={item.title+" — फोटो "+(i+1)} loading="lazy" decoding="async" onError={e=>{e.currentTarget.style.display="none";}} />)}</div>;
+}
 function Skeletons() { return <div className="skeleton-list">{[1, 2, 3, 4].map(i => <div className="skeleton-card" key={i}><div className="sk-image" /><div className="sk-copy"><i /><i /><i /></div></div>)}</div>; }
 
 function EpaperPage() {
@@ -247,7 +264,7 @@ function EpaperPage() {
 
 export default function AppProduction() {
   if(window.location.pathname==="/epaper") return <EpaperPage />;
-  const [news, setNews] = useState(FALLBACK), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
+  const [news, setNews] = useState([]), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
   const [saved, setSaved] = useState(() => {
     try {
       const bookmarks = readStorageJson("awaaz-bookmarks", []).map(x => String(x)).filter(Boolean);
@@ -324,23 +341,25 @@ export default function AppProduction() {
       if (category !== "होम") params.set("category", category);
       if (district) params.set("location", district);
       if (query.trim()) params.set("q", query.trim());
-      const url = `${API_BASE}/api/news?${params.toString()}`;
+      const path = `/api/news?${params.toString()}`;
       const load = async () => {
+        const targets = import.meta.env.DEV ? [`${API_BASE}${path}`] : [path, `${PRODUCTION_API_FALLBACK}${path}`];
         let lastError = null;
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          if (controller.signal.aborted) throw new DOMException("Request aborted", "AbortError");
-          try {
-            const response = await fetch(url, {
-              headers: { Accept: "application/json", "Cache-Control": "no-cache" },
-              cache: "no-store",
-              signal: controller.signal
-            });
-            if (!response.ok) throw new Error(`News API HTTP ${response.status}`);
-            return await response.json();
-          } catch (error) {
-            lastError = error;
-            if (controller.signal.aborted || attempt === 2) throw lastError;
-            await new Promise(resolve => window.setTimeout(resolve, 250 * (attempt + 1)));
+        for (const target of targets) {
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            if (controller.signal.aborted) throw new DOMException("Request aborted", "AbortError");
+            try {
+              const response = await fetch(target, { headers: { Accept: "application/json", "Cache-Control": "no-cache" }, cache: "no-store", signal: controller.signal });
+              if (!response.ok) throw new Error(`News API HTTP ${response.status}`);
+              const data = await response.json();
+              const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
+              if (!Array.isArray(list)) throw new Error("News API response invalid");
+              return data;
+            } catch (error) {
+              lastError = error;
+              if (controller.signal.aborted) throw lastError;
+              if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 250));
+            }
           }
         }
         throw lastError || new Error("News API unavailable");
