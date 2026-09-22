@@ -32,9 +32,9 @@ async function api(path,options={},attempt=0){
   let d={};try{d=await r.json()}catch{}
   if(!r.ok){
    if((r.status===502||r.status===503||r.status===504)&&attempt<2){await sleep(500*(attempt+1));return api(path,options,attempt+1);}
-   if(r.status===401){clearLegacyAdminToken();throw new Error(d.message||"Session expired. कृपया फिर login करें।");}
-   if(r.status===429)throw new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");
-   if(r.status===502||r.status===503||r.status===504)throw new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");
+   if(r.status===401){const err=new Error(d.message||"Session expired. कृपया फिर login करें।");err.status=401;clearLegacyAdminToken();throw err;}
+   if(r.status===429){const err=new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");err.status=429;throw err;}
+   if(r.status===502||r.status===503||r.status===504){const err=new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");err.status=r.status;throw err;}
    throw new Error(d.message||`Server request failed (${r.status}). कृपया कुछ सेकंड बाद फिर प्रयास करें।`);
   }
   return d;
@@ -62,7 +62,7 @@ async function boot(){
   try{await loadAll();await loadProfile();}
   catch(error){console.error("ADMIN_BOOT_DATA_LOAD_FAILED",error);toast("Login सफल है। Dashboard data थोड़ी देर में Refresh करें।");}
  }catch(error){
-  clearLegacyAdminToken();
+  if(error?.status===401){clearLegacyAdminToken();}
   showLogin();
  }
 }
