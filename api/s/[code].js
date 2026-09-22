@@ -1,0 +1,1 @@
+import share from "../../frontend/api/share.js";\nexport default function handler(req,res){req.query={...(req.query||{}),slug:req.query?.code||req.query?.slug||""};return share(req,res);}\n
