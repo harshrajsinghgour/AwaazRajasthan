@@ -165,7 +165,7 @@ async function sendAdminOtpEmail(to,name,otp){
 }
 const ADMIN_SESSION_TTL="30d";
 const ADMIN_COOKIE_MAX_AGE=30*24*60*60*1000;
-const DUMMY_ADMIN_PASSWORD_HASH="$2b$12$LQv3c1yqBWdHnW2p1VqQ.eW5fQJ4yJfH4p8n7q4Y4m3Jr7m8m9sW2";
+const DUMMY_ADMIN_PASSWORD_HASH="$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 const sign=a=>jwt.sign({sub:String(a._id),role:a.role,email:a.email,sv:a.sessionVersion||0},JWT_SECRET||"development-secret",{expiresIn:ADMIN_SESSION_TTL});
 async function verifyAdminPassword(admin,password){
  if(typeof password!=="string"||!password)return false;
