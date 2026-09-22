@@ -50,7 +50,17 @@ function mediaUrl(src) {
   if (typeof src !== "string" || !src.trim()) return "";
   const value = src.trim();
   if (/^(data:|blob:)/i.test(value)) return value;
-  if (/^https?:\/\//i.test(value)) return value;
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const parsed = new URL(value);
+      // Keep the Render backend hostname out of public media URLs. Existing
+      // uploads may contain the old absolute URL; route them through Vercel.
+      if (parsed.hostname === "awaazrajasthan.onrender.com" && parsed.pathname.startsWith("/api/media/")) {
+        return parsed.pathname + parsed.search;
+      }
+    } catch {}
+    return value;
+  }
   if (value.startsWith("/")) return value;
   try { return new URL(value, `${API_BASE || window.location.origin}/`).href; } catch { return value; }
 }
