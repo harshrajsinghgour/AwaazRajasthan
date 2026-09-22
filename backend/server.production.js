@@ -231,7 +231,10 @@ async function storeUploadedFile(file,folder){
   try{await fs.promises.unlink(file.path)}catch{}
  }
  const relative="/api/media/"+key.split("/").map(encodeURIComponent).join("/");
- return {key,url:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
+ // Public clients should use the same-origin Vercel proxy. Keep the Render
+ // API hostname out of persisted media URLs while retaining the absolute
+ // base internally for compatibility/debugging.
+ return {key,url:relative,publicUrl:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
 }
 async function getB2SignedUrl(key){
  if(!B2_ENABLED) return null;
@@ -292,7 +295,11 @@ app.get("/api/notifications/public-key",(_r,res)=>{const key=String(process.env.
 app.get("/api/sitemap.xml",async(_req,res,next)=>{try{const rows=await News.find({status:"published"}).select("slug updatedAt publishedAt createdAt").sort({publishedAt:-1,updatedAt:-1}).limit(5000).lean();const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");const base=String(process.env.FRONTEND_URL||"https://awaazrajasthan.vercel.app").replace(/\/$/,"");const urls=[`<url><loc>${esc(base)}/</loc></url>`];for(const x of rows){const id=x.slug||"";if(!id)continue;const d=x.updatedAt||x.publishedAt||x.createdAt;if(d)urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc><lastmod>${new Date(d).toISOString()}</lastmod></url>`);else urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc></url>`);}res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);}catch(e){next(e);}});
 app.get("/api/news",async(req,res,next)=>{try{const limit=Math.min(Math.max(Number(req.query.limit)||30,1),100),page=Math.min(Math.max(Number(req.query.page)||1,1),1000),f={status:"published"};const category=boundedText(req.query.category,80),location=boundedText(req.query.location,80),q=boundedText(req.query.q,200);if(category&&category!=="होम")f.category=category;if(location)f.location=location;if(q)f.$text={$search:q};if(req.query.featured==="true")f.featured=true;const [items,total]=await Promise.all([News.find(f).sort({featured:-1,publishedAt:-1,createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),News.countDocuments(f)]);res.set("Cache-Control","no-store, no-cache, must-revalidate, proxy-revalidate");res.set("Pragma","no-cache");res.set("Expires","0");res.json({news:items,data:items,pagination:{page,limit,total,pages:Math.ceil(total/limit)}});}catch(e){next(e);}});
 app.get("/api/news/:id",async(req,res,next)=>{try{const key=boundedText(req.params.id,180);const item=mongoose.isValidObjectId(key)?await News.findOneAndUpdate({_id:key,status:"published"},{$inc:{views:1}},{new:true}).lean():await News.findOneAndUpdate({slug:key,status:"published"},{$inc:{views:1}},{new:true}).lean();if(!item)return res.status(404).json({message:"News not found"});res.json({news:item,data:item});}catch(e){next(e);}});
-app.get("/api/categories",async(_r,res,next)=>{try{const rows=await Category.find({active:true}).sort({sortOrder:1,name:1}).lean();publicCache(res,300,900);res.json({categories:rows.map(x=>x.name),items:rows});}catch(e){next(e);}});
+app.get("/api/categories",async(_r,res,next)=>{try{const rows=await Category.find({active:true}).sort({sortOrder:1,name:1}).lean();
+  const fallbackRows=NEWS_CATEGORIES.map((name,index)=>({name,icon:CATEGORY_ICONS[name]||"📰",active:true,sortOrder:index}));
+  const items=rows.length?rows:fallbackRows;
+  publicCache(res,rows.length?300:60,rows.length?900:120);
+  res.json({categories:items.map(x=>x.name),items});}catch(e){next(e);}});
 app.get("/api/home-buttons",async(_r,res,next)=>{try{const rows=await HomeNavButton.find({active:true}).sort({sortOrder:1,_id:1}).lean();publicCache(res,300,900);res.json({buttons:rows});}catch(e){next(e);}});
 app.get("/api/legal-settings",async(_r,res,next)=>{try{const x=await LegalSettings.findOne({key:"default"}).lean();publicCache(res,300,900);res.json({settings:x||{grievanceOfficerName:"",grievanceOfficerEmail:"",grievanceAddress:"",privacyEmail:""}});}catch(e){next(e);}});
 app.post("/api/grievances",async(req,res,next)=>{try{const name=boundedText(req.body?.name,120),email=String(req.body?.email||"").trim().toLowerCase(),mobile=boundedText(req.body?.mobile,20),subject=boundedText(req.body?.subject,200),message=boundedText(req.body?.message,5000);if(!name||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!subject||!message)return res.status(400).json({message:"नाम, सही ईमेल, विषय और शिकायत संदेश आवश्यक हैं।"});const ticketId="AR-GR-"+Date.now().toString(36).toUpperCase()+"-"+crypto.randomBytes(3).toString("hex").toUpperCase();const g=await Grievance.create({ticketId,name,email,mobile,subject,message});res.status(201).json({ok:true,ticketId:g.ticketId,message:"शिकायत दर्ज हो गई है।"});}catch(e){next(e);}});
