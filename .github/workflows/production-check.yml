@@ -187,7 +187,9 @@ jobs:
           done
           curl -L -sS --max-time 30 "$base/manifest.webmanifest" | grep -q 'आवाज़ राजस्थान'
           curl -L -sS --max-time 30 "$base/robots.txt" | grep -q 'Sitemap:'
-          echo "Vercel live shell/SEO smoke OK"
+          vercel_news=$(curl -L -sS --max-time 30 "$base/api/news?limit=1&_smoke=$(date +%s)")
+          echo "$vercel_news" | grep -q '"pagination"'
+          echo "Vercel live shell + API proxy + SEO smoke OK"
 
   deployment-config:
     name: Deployment configuration
