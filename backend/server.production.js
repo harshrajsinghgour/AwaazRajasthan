@@ -57,11 +57,11 @@ app.use(express.json({limit:"1mb"}));
 app.use(express.urlencoded({extended:true,limit:"1mb"}));
 app.use(cookieParser());
 app.use(morgan(PROD?"combined":"dev"));
-app.use("/api",rateLimit({windowMs:15*60*1000,limit:5000,standardHeaders:"draft-8",legacyHeaders:false,skip:req=>req.path==="/admin/login"}));
-app.use("/api/admin/change-password",rateLimit({windowMs:15*60*1000,limit:100,standardHeaders:"draft-8",legacyHeaders:false}));
-const adImpressionLimiter=rateLimit({windowMs:15*60*1000,limit:1200,standardHeaders:"draft-8",legacyHeaders:false});
-const adClickLimiter=rateLimit({windowMs:15*60*1000,limit:600,standardHeaders:"draft-8",legacyHeaders:false});
-const subscriptionLimiter=rateLimit({windowMs:60*60*1000,limit:100,standardHeaders:"draft-8",legacyHeaders:false});
+app.use("/api",rateLimit({windowMs:10*60*1000,limit:10000,standardHeaders:"draft-8",legacyHeaders:false,skip:req=>req.path==="/admin/login"}));
+app.use("/api/admin/change-password",rateLimit({windowMs:10*60*1000,limit:1000,standardHeaders:"draft-8",legacyHeaders:false}));
+const adImpressionLimiter=rateLimit({windowMs:10*60*1000,limit:12000,standardHeaders:"draft-8",legacyHeaders:false});
+const adClickLimiter=rateLimit({windowMs:10*60*1000,limit:6000,standardHeaders:"draft-8",legacyHeaders:false});
+const subscriptionLimiter=rateLimit({windowMs:10*60*1000,limit:1000,standardHeaders:"draft-8",legacyHeaders:false});
 // Durable media is served only through Backblaze B2; local uploads are temporary staging files.
 app.get(/^\/api\/media\/(.+)$/,async(req,res,next)=>{
  try{
@@ -289,7 +289,7 @@ async function getAdPrices(){
 }
 app.get("/api/ad-bookings/options",async(_req,res,next)=>{try{const rows=await getAdPrices();res.json({positions:rows,payment:{provider:"razorpay",checkout:true,upiQr:false}})}catch(e){next(e)}});
 
-const bookingUploadLimiter=rateLimit({windowMs:60*60*1000,limit:120,standardHeaders:"draft-8",legacyHeaders:false});
+const bookingUploadLimiter=rateLimit({windowMs:10*60*1000,limit:1200,standardHeaders:"draft-8",legacyHeaders:false});
 app.post("/api/ad-bookings/upload",bookingUploadLimiter,upload.single("file"),async(req,res,next)=>{try{if(!req.file)return res.status(400).json({message:"File required"});if(!req.file.mimetype.startsWith("image/")&&!req.file.mimetype.startsWith("video/"))return res.status(400).json({message:"केवल image या video upload करें"});const folder=req.file.mimetype.startsWith("video/")?"ad-bookings/videos":"ad-bookings/images";const stored=await storeUploadedFile(req.file,folder);res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,storage:stored.storage});}catch(e){next(e)}});
 app.post("/api/ad-bookings/:bookingId/create-order",bookingUploadLimiter,async(req,res,next)=>{try{if(!razorpay)return res.status(503).json({message:"Razorpay payment is not configured"});const bookingId=boundedText(req.params.bookingId,80),b=await AdBooking.findOne({bookingId});if(!b)return res.status(404).json({message:"Booking नहीं मिली"});if(b.paymentStatus==="paid")return res.json({paid:true,booking:{bookingId:b.bookingId,amount:b.amount,status:b.status,paymentStatus:b.paymentStatus}});const order=await razorpay.orders.create({amount:Math.round(Number(b.amount)*100),currency:"INR",receipt:b.bookingId,notes:{bookingId:b.bookingId,businessName:b.businessName,position:b.position}});b.razorpayOrderId=order.id;b.paymentMethod="upi";b.paymentStatus="pending";await b.save();res.json({keyId:RAZORPAY_KEY_ID,orderId:order.id,amount:order.amount,currency:order.currency,bookingId:b.bookingId});}catch(e){next(e)}});
 app.post("/api/ad-bookings",bookingUploadLimiter,async(req,res,next)=>{try{const b=req.body||{},businessName=boundedText(b.businessName,150),contactName=boundedText(b.contactName,100),mobile=boundedText(b.mobile,20),email=String(b.email||"").toLowerCase().trim(),title=boundedText(b.title,150),position=String(b.position||""),device=AD_DEVICES.includes(String(b.device))?String(b.device):"all",requestedDays=Math.floor(Number(b.days||1)),image=boundedText(b.image,1000),video=boundedText(b.video,1000),link=String(b.link||"").trim();if(!businessName||!contactName||!mobile||!isValidEmail(email)||!title||!AD_POSITIONS.includes(position)||!Number.isInteger(requestedDays)||requestedDays<1||requestedDays>365)return res.status(400).json({message:"Booking details सही भरें"});if(link&&!isHttpUrl(link))return res.status(400).json({message:"Invalid ad link"});if(!image&&!video)return res.status(400).json({message:"Ad की photo या video में से कम-से-कम एक upload करें"});const days=requestedDays;const prices=await getAdPrices();const price=prices.find(x=>x.position===position);if(!price)return res.status(400).json({message:"इस ad position की pricing उपलब्ध नहीं है"});const imageRatePerDay=Number(price.imageRatePerDay||price.ratePerDay||0),videoRatePerDay=Number(price.videoRatePerDay||0),requestedMediaType=["image","video"].includes(String(b.mediaType))?String(b.mediaType):image&&video?"both":video?"video":"image";if(requestedMediaType==="image"&&!image)return res.status(400).json({message:"Photo ad के लिए photo upload करें"});if(requestedMediaType==="video"&&!video)return res.status(400).json({message:"Video ad के लिए video upload करें"});if(requestedMediaType==="both"&&(!image||!video))return res.status(400).json({message:"Photo + Video दोनों के लिए दोनों files upload करें"});const mediaType=requestedMediaType,ratePerDay=mediaType==="video"?videoRatePerDay:mediaType==="both"?imageRatePerDay+videoRatePerDay:imageRatePerDay,amount=days*ratePerDay;const bookingId=`AR-AD-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;const booking=await AdBooking.create({bookingId,businessName,contactName,mobile,email,website:boundedText(b.website,500),title,position,device,startDate:null,endDate:null,days,ratePerDay,imageRatePerDay,videoRatePerDay,mediaType,amount,image,video,link,message:boundedText(b.message,1000),paymentMethod:"upi"});res.status(201).json({booking:{bookingId:booking.bookingId,amount:booking.amount,days:booking.days,ratePerDay:booking.ratePerDay,imageRatePerDay:booking.imageRatePerDay,videoRatePerDay:booking.videoRatePerDay,mediaType:booking.mediaType,status:booking.status,paymentStatus:booking.paymentStatus},payment:{provider:"razorpay",upiQr:true}});}catch(e){next(e)}});
@@ -376,7 +376,7 @@ const resetAdminWithOtp=async(target,otp,nextPassword)=>{
  record.used=true;await record.save();await AdminOtp.deleteMany({adminId:target._id});
  return {ok:true};
 };
-app.post("/api/admin/password/request-otp",rateLimit({windowMs:15*60*1000,limit:5,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{
+app.post("/api/admin/password/request-otp",rateLimit({windowMs:10*60*1000,limit:50,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{
  try{
   const email=String(req.body?.email||"").toLowerCase().trim();
   if(!isValidEmail(email))return res.status(400).json({message:"Valid email required"});
@@ -385,7 +385,7 @@ app.post("/api/admin/password/request-otp",rateLimit({windowMs:15*60*1000,limit:
   res.json({ok:true,message:"अगर यह registered admin email है, OTP भेज दिया गया है।"});
  }catch(e){next(e);}
 });
-app.post("/api/admin/password/reset-otp",rateLimit({windowMs:15*60*1000,limit:10,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{
+app.post("/api/admin/password/reset-otp",rateLimit({windowMs:10*60*1000,limit:100,standardHeaders:"draft-8",legacyHeaders:false}),async(req,res,next)=>{
  try{
   const email=String(req.body?.email||"").toLowerCase().trim(),otp=String(req.body?.otp||"").trim(),nextPassword=String(req.body?.newPassword||"");
   if(!isValidEmail(email)||!/^[0-9]{6}$/.test(otp))return res.status(400).json({message:"Valid email और 6 digit OTP required"});
