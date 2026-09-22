@@ -265,7 +265,7 @@ function EpaperPage() {
 
 export default function AppProduction() {
   if(window.location.pathname==="/epaper") return <EpaperPage />;
-  const [news, setNews] = useState([]), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
+  const [news, setNews] = useState(() => readStorageJson("awaaz-news-cache", [])), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
   const [saved, setSaved] = useState(() => {
     try {
       const bookmarks = readStorageJson("awaaz-bookmarks", []).map(x => String(x)).filter(Boolean);
@@ -338,7 +338,7 @@ export default function AppProduction() {
     const timeoutId = window.setTimeout(() => controller.abort(), 10000);
     setLoading(true);
     const timer = setTimeout(() => {
-      const params = new URLSearchParams({ limit: "100", _t: String(Date.now()) });
+      const params = new URLSearchParams({ limit: query.trim() ? "100" : "20", _t: String(Date.now()) });
       if (category !== "होम") params.set("category", category);
       if (district) params.set("location", district);
       if (query.trim()) params.set("q", query.trim());
@@ -368,7 +368,7 @@ export default function AppProduction() {
       load()
         .then(data => {
           const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
-          if (!cancelled && Array.isArray(list)) { const normalized=list.map(normalize); setNews(prev => normalized.length ? normalized : prev); }
+          if (!cancelled && Array.isArray(list)) { const normalized=list.map(normalize); if (normalized.length) { setNews(normalized); if (category === "होम" && !district && !query.trim()) writeStorage("awaaz-news-cache", JSON.stringify(normalized.slice(0,20))); } }
         })
         .catch(error => {
           if (!cancelled && error?.name !== "AbortError") console.warn("NEWS_FEED_LOAD_FAILED", error);
