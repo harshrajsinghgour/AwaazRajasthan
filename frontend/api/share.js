@@ -44,7 +44,7 @@ export default async function handler(req,res){
     const rawDescription=clean(n.excerpt)||clean(n.summary)||clean(n.description)||clean(n.content);
     const description=(rawDescription||"राजस्थान की ताज़ा, स्थानीय और जरूरी खबरें।").slice(0,320);
     const rawImage=firstMediaImage(n);
-    const image=rawImage?new URL(rawImage,origin).href:new URL("/og-default.svg",origin).href;
+    const image=rawImage?origin+"/api/share-image?code="+encodeURIComponent(sharePath):new URL("/og-default.svg",origin).href;
     const video=firstVideo(n);
     const canonical=origin+"/news/"+encodeURIComponent(sharePath);
 
@@ -64,9 +64,9 @@ export default async function handler(req,res){
       "<meta property=\"og:description\" content=\""+esc(description)+"\">",
       "<meta property=\"og:url\" content=\""+esc(canonical)+"\">",
       "<meta property=\"og:image\" content=\""+esc(image)+"\">",
-      "<meta property=\"og:image:secure_url\" content=\""+esc(image)+"\">",
+      "<meta property=\"og:image:secure_url\" content=\""+esc(image)+"\">\n      <meta property=\"og:image:width\" content=\"1200\">\n      <meta property=\"og:image:height\" content=\"630\">",
       "<meta property=\"og:image:alt\" content=\""+esc(title)+"\">",
-      "<meta property=\"og:image:type\" content=\"image/jpeg\">",
+      "",
       "<meta name=\"twitter:card\" content=\"summary_large_image\">",
       "<meta name=\"twitter:title\" content=\""+esc(title)+"\">",
       "<meta name=\"twitter:description\" content=\""+esc(description)+"\">",
