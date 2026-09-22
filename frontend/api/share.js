@@ -1,5 +1,9 @@
+function shortCodeFromId(id){try{const hex=String(id||"").trim();if(!/^[a-fA-F0-9]{24}$/.test(hex))return "";let bin="";for(let i=0;i<24;i+=2)bin+=String.fromCharCode(parseInt(hex.slice(i,i+2),16));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}catch{return "";}}
+function idFromShortCode(code){try{const s=String(code||"").replace(/-/g,"+").replace(/_/g,"/");const bin=atob(s);if(bin.length!==12)return "";let hex="";for(let i=0;i<bin.length;i++)hex+=bin.charCodeAt(i).toString(16).padStart(2,"0");return /^[a-fA-F0-9]{24}$/.test(hex)?hex:"";}catch{return "";}}
+
 export default async function handler(req,res){
-  const slug=String(req.query?.slug||"").split("/")[0];
+  let slug=String(req.query?.slug||"").split("/")[0];
+  const decoded=idFromShortCode(slug); if(decoded) slug=decoded;
   if(!slug)return res.status(400).send("Missing news slug");
   const origin="https://"+String(req.headers.host||"awaazrajasthan.vercel.app").replace(/\/$/,"");
   const apiBase=String(process.env.PUBLIC_API_URL||"https://awaazrajasthan.onrender.com").replace(/\/$/,"");
