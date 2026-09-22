@@ -16,7 +16,7 @@
     },
     {
       "source": "/news/:path*",
-      "destination": "/index.html"
+      "destination": "/api/share?slug=:path*"
     },
     {
       "source": "/:path*",
