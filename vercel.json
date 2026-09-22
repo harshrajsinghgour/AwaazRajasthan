@@ -24,6 +24,10 @@
       "destination": "/api/n/:path*"
     },
     {
+      "source": "/s/:path*",
+      "destination": "/api/s/:path*"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }
