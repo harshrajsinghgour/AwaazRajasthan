@@ -228,7 +228,7 @@ async function auth(req,res,next){
  try{
   const cookieToken=req.cookies["__Host-awaaz_admin"]||req.cookies.awaaz_admin||"";
   const bearer=String(req.headers.authorization||"").replace(/^Bearer\s+/i,"");
-  const token=cookieToken||bearer;
+  const token=bearer||cookieToken;
   if(!token)return res.status(401).json({message:"Authentication required"});
   const p=jwt.verify(token,JWT_SECRET||"development-secret");
   const a=await Admin.findById(p.sub);
@@ -315,7 +315,7 @@ app.post("/api/admin/login",rateLimit({windowMs:10*60*1000,limit:1000,standardHe
   await admin.save();
   setCookie(res,sign(admin));
   res.set("Cache-Control","no-store");
-  res.json({ok:true,admin:safe(admin)});
+  res.json({ok:true,admin:safe(admin),token:sign(admin)});
  }catch(e){next(e);}
 });
 app.post("/api/admin/logout",optionalAuth,async(req,res,next)=>{try{if(req.admin){req.admin.sessionVersion=Number(req.admin.sessionVersion||0)+1;await req.admin.save();}clearCookie(res);res.json({ok:true});}catch(e){next(e);}});
@@ -348,7 +348,7 @@ app.patch("/api/admin/profile",auth,async(req,res,next)=>{
   if(!admin)return res.status(404).json({message:"Admin profile not found"});
   setCookie(res,sign(admin));
   res.set("Cache-Control","no-store");
-  res.json({ok:true,admin:safe(admin),reauthRequired:false});
+  res.json({ok:true,admin:safe(admin),token:sign(admin),reauthRequired:false});
  }catch(e){next(e)}
 });
 app.post("/api/admin/profile/upload",auth,upload.single("file"),async(req,res,next)=>{
@@ -417,7 +417,7 @@ app.post("/api/admin/admin-password/reset-otp",auth,ownerOnly,async(req,res,next
   return res.status(result.status).json({message:result.message});
  }catch(e){next(e);}
 });
-app.post("/api/admin/change-password",auth,async(req,res,next)=>{try{const current=String(req.body.currentPassword||""),nextPassword=String(req.body.newPassword||"");if(nextPassword.length<10)return res.status(400).json({message:"New password must be at least 10 characters"});if(!(await bcrypt.compare(current,req.admin.passwordHash)))return res.status(401).json({message:"Current password is incorrect"});req.admin.passwordHash=await bcrypt.hash(nextPassword,12);req.admin.sessionVersion+=1;await req.admin.save();setCookie(res,sign(req.admin));res.json({ok:true});}catch(e){next(e);}});
+app.post("/api/admin/change-password",auth,async(req,res,next)=>{try{const current=String(req.body.currentPassword||""),nextPassword=String(req.body.newPassword||"");if(nextPassword.length<10)return res.status(400).json({message:"New password must be at least 10 characters"});if(!(await bcrypt.compare(current,req.admin.passwordHash)))return res.status(401).json({message:"Current password is incorrect"});req.admin.passwordHash=await bcrypt.hash(nextPassword,12);req.admin.sessionVersion+=1;await req.admin.save();const token=sign(req.admin);setCookie(res,token);res.json({ok:true,token});}catch(e){next(e);}});
 app.post("/api/admin/logout-all",auth,async(req,res)=>{req.admin.sessionVersion+=1;await req.admin.save();clearCookie(res);res.json({ok:true});});
 app.get("/api/admin/dashboard",auth,async(req,res,next)=>{try{const owner=req.admin.role==="owner",newsAccess=owner||req.admin.permissions?.some(p=>["news:read","news:write","news:delete"].includes(p));const stats={};if(newsAccess){const [news,published,drafts,views]=await Promise.all([News.countDocuments(),News.countDocuments({status:"published"}),News.countDocuments({status:"draft"}),News.aggregate([{$group:{_id:null,total:{$sum:"$views"}}}])]);stats.news=news;stats.published=published;stats.drafts=drafts;stats.views=views[0]?.total||0;}if(owner){const [ads,ast]=await Promise.all([Ad.countDocuments(),Ad.aggregate([{$group:{_id:null,impressions:{$sum:"$impressions"},clicks:{$sum:"$clicks"}}}])]);stats.ads=ads;stats.impressions=ast[0]?.impressions||0;stats.clicks=ast[0]?.clicks||0;}res.json({stats});}catch(e){next(e);}});
 app.post("/api/admin/notifications/send",auth,ownerOnly,async(req,res,next)=>{try{const title=boundedText(req.body?.title,120),body=boundedText(req.body?.body,300),rawUrl=String(req.body?.url||"/").trim()||"/";if(!title||!body)return res.status(400).json({message:"Title and message are required"});if(!rawUrl.startsWith("/")||rawUrl.startsWith("//")||/[\\r\\n]/.test(rawUrl))return res.status(400).json({message:"Notification URL must be a same-origin path"});const result=await deliverPushToActiveSubscribers({title,body,url:rawUrl,tagPrefix:"awaaz-manual"});if(!result.configured)return res.status(503).json({message:"Push notification service is not configured"});res.json({ok:true,...result});}catch(e){next(e);}});
