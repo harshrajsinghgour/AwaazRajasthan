@@ -16,7 +16,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) throw new Error("
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
 const newsSchema = new mongoose.Schema({ title: String, slug: String, excerpt: String, category: String, location: String, image: String, status: String, breaking: Boolean, publishedAt: Date, pushNotifiedAt: Date }, { collection: "news", timestamps: true });
-const subscriberSchema = new mongoose.Schema({ endpoint: { type: String, unique: true }, subscription: mongoose.Schema.Types.Mixed, active: Boolean, lastSuccessAt: Date, lastFailureAt: Date }, { collection: "subscribers", timestamps: true });
+const subscriberSchema = new mongoose.Schema({ endpoint: { type: String, unique: true }, subscription: mongoose.Schema.Types.Mixed, district: { type: String, default: "" }, category: { type: String, default: "" }, active: Boolean, lastSuccessAt: Date, lastFailureAt: Date }, { collection: "subscribers", timestamps: true });
 const deliverySchema = new mongoose.Schema({
   newsId: { type: mongoose.Schema.Types.ObjectId, unique: true },
   claimToken: { type: String, default: "" },
@@ -103,7 +103,7 @@ async function sendOne(row, payload) {
 }
 
 async function sendToSubscribers(news, claimToken) {
-  const subscribers = await Subscriber.find({ active: true }).select("endpoint subscription").lean();
+  const filter={active:true,$or:[{district:""},{district:news.location||""}]};if(news.category)filter.$or.push({category:""},{category:news.category});const subscribers = await Subscriber.find({active:true,$and:[{ $or:[{district:""},{district:news.location||""}]},{ $or:[{category:""},{category:news.category||""}]}]}).select("endpoint subscription district category").lean();
   if (!subscribers.length) return { sent: 0, removed: 0, retry: 0, remaining: 0, noSubscribers: true };
 
   const delivery = await Delivery.findOne({ newsId: news._id, claimToken, status: "processing" }).select("deliveredEndpoints").lean();
