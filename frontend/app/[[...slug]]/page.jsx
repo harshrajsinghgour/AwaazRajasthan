@@ -3,6 +3,19 @@ import ClientApp from "../ClientApp";
 const BACKEND = String(process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://awaazrajasthan.onrender.com").replace(/\/$/, "");
 const SITE = String(process.env.NEXT_PUBLIC_SITE_URL || "https://awaazrajasthan.vercel.app").replace(/\/$/, "");
 
+async function getHomeNews() {
+  try {
+    const response = await fetch(`${BACKEND}/api/news?limit=30`, {
+      next: { revalidate: 10, tags: ["news"] }
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.news) ? data.news : Array.isArray(data?.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
+
 async function getArticle(slug) {
   if (!slug) return null;
   const key = decodeURIComponent(String(slug));
@@ -46,5 +59,6 @@ export default async function Page({ params }) {
     mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE}/news/${encodeURIComponent(article.slug || parts[1])}` },
     image: Array.isArray(article.image) ? article.image : article.image ? [article.image] : []
   } : null;
-  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}<ClientApp /></>;
+  const initialNews = !isArticle ? await getHomeNews() : [];
+  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}<ClientApp initialNews={initialNews} /></>;
 }
