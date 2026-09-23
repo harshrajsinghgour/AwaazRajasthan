@@ -159,3 +159,20 @@ body.dark .ad-slot.ad-live,.dark .ad-slot.ad-live{background:#151a22;border-colo
   .section-only-layout{max-width:none}
   .section-only-layout .news-row{grid-template-columns:108px minmax(0,1fr)}
 }
+
+/* Mobile home navigation — lighter active state */
+@media (max-width:767px){
+  .mobile-bottom-nav button.active{
+    color:#b91c24!important;
+    background:rgba(215,25,32,.075)!important;
+    border:1px solid rgba(215,25,32,.10)!important;
+    border-radius:15px!important;
+    margin:5px 4px!important;
+  }
+  .mobile-bottom-nav button.active .wa-icon{
+    color:#b91c24!important;
+    background:rgba(215,25,32,.10)!important;
+    border-radius:9px!important;
+    padding:3px!important;
+  }
+}
