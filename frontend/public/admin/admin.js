@@ -121,8 +121,16 @@ const handleLogin=async e=>{
  window.__awaazLoginInFlight=true;
  error.textContent="";
  status.className="login-status loading";
- status.textContent="Login हो रहा है…";
+ status.textContent="Secure login शुरू हो रहा है…";
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
+ const loginStarted=Date.now();
+ const loginProgress=setInterval(()=>{
+  if(!window.__awaazLoginInFlight)return;
+  const elapsed=Math.round((Date.now()-loginStarted)/1000);
+  if(elapsed>=10)status.textContent="Server response की अंतिम कोशिश चल रही है…";
+  else if(elapsed>=5)status.textContent="Server से secure response का इंतज़ार…";
+  else if(elapsed>=2)status.textContent="Credentials verify हो रहे हैं…";
+ },500);
  try{
   const loginResponse=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
   if(loginResponse?.token)setAdminToken(loginResponse.token,$("rememberLogin")?.checked===true);
@@ -139,6 +147,7 @@ const handleLogin=async e=>{
   status.textContent=err.message||"Login failed";
   error.textContent="";
  }finally{
+  clearInterval(loginProgress);
   btn.disabled=false;
   btn.textContent=btn.dataset.oldText||"↪ Login";
   window.__awaazLoginInFlight=false;
