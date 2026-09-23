@@ -4,11 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 function shortCodeFromId(id){try{const hex=String(id||"").trim();if(!/^[a-fA-F0-9]{24}$/.test(hex))return "";let bin="";for(let i=0;i<24;i+=2)bin+=String.fromCharCode(parseInt(hex.slice(i,i+2),16));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}catch{return "";}}
 function idFromShortCode(code){try{const s=String(code||"").replace(/-/g,"+").replace(/_/g,"/");const bin=atob(s);if(bin.length!==12)return "";let hex="";for(let i=0;i<bin.length;i++)hex+=bin.charCodeAt(i).toString(16).padStart(2,"0");return /^[a-fA-F0-9]{24}$/.test(hex)?hex:"";}catch{return "";}}
 
-const API_BASE = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "")
-  : "";
-const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
-const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
+const VITE_ENV = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
+const NEXT_PUBLIC_API_URL = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "") : "";
+const API_BASE = (VITE_ENV.DEV ? (VITE_ENV.VITE_API_URL || VITE_ENV.VITE_BACKEND_URL || "http://localhost:5000") : (VITE_ENV.VITE_API_URL || NEXT_PUBLIC_API_URL || "")).replace(/\/$/, "");
+const E_PAPER_URL = VITE_ENV.VITE_E_PAPER_URL || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_E_PAPER_URL || "/epaper") : "/epaper");
+const BUILD_VAPID_PUBLIC_KEY = VITE_ENV.VITE_VAPID_PUBLIC_KEY || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "") : "");
 
 const DEFAULT_CATEGORIES = ["होम", "भारत", "विश्व", "राजस्थान", "जयपुर", "जोधपुर", "उदयपुर", "कोटा", "अजमेर", "भीलवाड़ा", "सभी जिले", "अपराध", "राजनीति", "शिक्षा", "नौकरी", "खेल", "मनोरंजन", "बिजनेस"];
 const DEFAULT_HOME_BUTTONS = [{label:"ताज़ा खबरें",icon:"🕒",action:"latest"},{label:"ब्रेकिंग न्यूज़",icon:"🔴",action:"breaking"},{label:"ट्रेंडिंग",icon:"🔥",action:"trending"},{label:"वीडियो",icon:"▶️",action:"video"},{label:"फोटो",icon:"📷",action:"photo"}];
