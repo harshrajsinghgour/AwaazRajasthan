@@ -1,0 +1,82 @@
+/* Awaaz Rajasthan — final premium v15
+   Editorial calm: cleaner surfaces, lighter chrome, stronger reading hierarchy.
+*/
+:root{
+  --wa15-bg:#f4f6f8;
+  --wa15-surface:#fff;
+  --wa15-ink:#16202b;
+  --wa15-muted:#6d7784;
+  --wa15-line:rgba(22,32,43,.085);
+  --wa15-red:#c91f2b;
+  --wa15-navy:#0b1624;
+  --wa15-shadow:0 8px 28px rgba(11,22,36,.055);
+}
+body{background:var(--wa15-bg)}
+.site-header{box-shadow:0 1px 0 var(--wa15-line),0 5px 18px rgba(11,22,36,.025)}
+.category-nav{background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.category-nav button{color:#657180;transition:color .16s ease,background .16s ease}
+.category-nav button:hover{background:rgba(11,22,36,.035);color:var(--wa15-ink)}
+.category-nav button.active{color:var(--wa15-red);background:rgba(201,31,43,.045);border-radius:10px}
+.category-nav button.active:after{display:none}
+.breaking-bar{box-shadow:0 1px 0 rgba(255,255,255,.05)}
+.main-content{padding-bottom:clamp(44px,6vw,82px)}
+.welcome-row h1{color:#111b27}
+.welcome-row p:not(.eyebrow){color:#77818d}
+.quick-tool{box-shadow:none!important;border-color:var(--wa15-line)!important}
+.quick-tool:hover{box-shadow:0 8px 22px rgba(11,22,36,.055)!important}
+.hero-card,.compact-card,.news-row,.side-card{
+  box-shadow:0 5px 20px rgba(11,22,36,.045)!important;
+}
+.hero-card:hover,.compact-card:hover,.news-row:hover{box-shadow:0 10px 26px rgba(11,22,36,.07)!important}
+.hero-copy h2,.news-row h3,.compact-card h3{color:#17212c}
+.section-heading{border-bottom-color:var(--wa15-line);padding-bottom:11px}
+.section-heading h2{letter-spacing:-.02em}
+.news-row{border-radius:16px}
+.side-card{border-radius:16px}
+.drawer{box-shadow:14px 0 45px rgba(0,0,0,.18)}
+.drawer-head{background:rgba(255,255,255,.96);position:sticky;top:0;z-index:2}
+.drawer-links h4{color:#8993a0;margin-top:22px}
+.drawer-links button,.drawer-links a{transition:background .15s ease,color .15s ease}
+.drawer-links button:hover,.drawer-links a:hover{background:#f4f6f8}
+.drawer-links button.active{background:rgba(201,31,43,.07);color:var(--wa15-red)}
+.site-footer{
+  background:linear-gradient(180deg,#0c1726,#09121f);
+  border-top:1px solid rgba(255,255,255,.07);
+}
+.site-footer .footer-grid{gap:42px}
+.site-footer .footer-grid>div{min-width:0}
+.site-footer h4{font-size:13px;letter-spacing:.01em}
+.site-footer p{color:#aab5c2}
+.site-footer a,.site-footer button{color:#aeb9c5;transition:color .15s ease,transform .15s ease}
+.site-footer a:hover,.site-footer button:hover{color:#fff;transform:translateX(2px)}
+.footer-bottom{color:#7f8b9a!important}
+.mobile-bottom-nav{
+  background:rgba(255,255,255,.965);
+  box-shadow:0 -8px 24px rgba(11,22,36,.055);
+}
+@media(max-width:767px){
+  .main-content{padding-bottom:30px}
+  .welcome-row h1{letter-spacing:-.025em}
+  .quick-tools>*{box-shadow:none!important}
+  .hero-card{box-shadow:0 7px 22px rgba(11,22,36,.055)!important}
+  .news-row{border-radius:13px}
+  .site-footer{padding-top:30px}
+  .site-footer .footer-grid{gap:20px}
+  .footer-bottom{padding-bottom:5px}
+  .mobile-bottom-nav button.active{
+    background:rgba(201,31,43,.075)!important;
+    color:#b51d28!important;
+    border:1px solid rgba(201,31,43,.10)!important;
+    border-radius:15px!important;
+    margin:5px 4px!important;
+  }
+  .mobile-bottom-nav button.active .wa-icon{
+    color:#b51d28!important;
+    background:rgba(201,31,43,.10)!important;
+    border-radius:9px!important;
+    padding:3px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  .category-nav button,.drawer-links button,.drawer-links a,.site-footer a,.site-footer button{transition:none!important}
+}
