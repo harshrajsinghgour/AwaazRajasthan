@@ -75,14 +75,23 @@ export default async function Page({ params }) {
   const parts = Array.isArray(resolved?.slug) ? resolved.slug : [];
   const isArticle = parts[0] === "news" && parts[1];
   const article = isArticle ? await getArticle(parts.slice(1).join("/")) : null;
+  const articleUrl = article ? SITE + "/news/" + encodeURIComponent(article.slug || parts[1]) : "";
   const jsonLd = article ? {
     "@context": "https://schema.org", "@type": "NewsArticle", headline: article.title, description: article.excerpt || "",
     datePublished: article.publishedAt || article.createdAt, dateModified: article.updatedAt || article.publishedAt || article.createdAt,
     author: { "@type": "Organization", name: article.author || "आवाज़ राजस्थान" },
     publisher: { "@type": "Organization", name: "आवाज़ राजस्थान", url: SITE },
-    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE}/news/${encodeURIComponent(article.slug || parts[1])}` },
+    mainEntityOfPage: { "@type": "WebPage", "@id": articleUrl },
     image: Array.isArray(article.image) ? article.image : article.image ? [article.image] : []
   } : null;
+  const breadcrumbLd = article ? {
+    "@context": "https://schema.org", "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "होम", item: SITE },
+      { "@type": "ListItem", position: 2, name: article.category || "राजस्थान", item: SITE + "/?category=" + encodeURIComponent(article.category || "राजस्थान") },
+      { "@type": "ListItem", position: 3, name: article.title, item: articleUrl }
+    ]
+  } : null;
   const initialNews = !isArticle ? await getHomeNews() : [];
-  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}<ClientApp initialNews={initialNews} /></>;
+  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}{breadcrumbLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />}<ClientApp initialNews={initialNews} /></>;
 }
