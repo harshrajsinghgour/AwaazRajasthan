@@ -42,7 +42,22 @@ async function api(path,options={},attempt=0){
  if(lastError instanceof TypeError)throw new Error("Server से connection नहीं हो पाया। कृपया फिर कोशिश करें।");
  throw lastError||new Error("Server request failed. कृपया फिर कोशिश करें।");
 }
-async function uploadMedia(file){if(!file)return "";if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");const base=getApiBase();const form=new FormData();form.append("file",file);const headers={};const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Image upload failed");return new URL(d.url,base||window.location.origin).href;}
+async function uploadMedia(file){
+ if(!file)return "";
+ if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");
+ const form=new FormData();form.append("file",file);let lastError=null;
+ for(const base of getApiCandidates()){
+  try{
+   const headers={};const token=getAdminToken();if(token)headers.Authorization="Bearer "+token;
+   const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});
+   let d={};try{d=await r.json()}catch{}
+   if(r.ok)return new URL(d.url,base||window.location.origin).href;
+   if(r.status===401){const err=new Error(d.message||"Session expired. फिर login करें।");err.status=401;throw err;}
+   lastError=new Error(d.message||"Media upload failed");
+  }catch(e){if(e?.status===401)throw e;lastError=e;}
+ }
+ throw lastError||new Error("Media upload failed");
+}
 function esc(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));}
 function toast(msg){const e=document.createElement("div");e.className="toast";e.textContent=msg;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
 function formatDate(value){if(!value)return "अभी तक कोई subscription नहीं";try{return new Date(value).toLocaleString("hi-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return "अभी तक कोई subscription नहीं";}}
