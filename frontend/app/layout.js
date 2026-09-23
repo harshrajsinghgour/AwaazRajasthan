@@ -13,6 +13,7 @@ import "../src/premium-editorial-v7.css";
 import "../src/signature-newsroom-v8.css";
 import "../src/signature-editorial-v9.css";
 import "../src/signature-editorial-v10.css";
+import "../src/signature-editorial-v11.css";
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://awaazrajasthan.vercel.app"),
