@@ -480,12 +480,6 @@ export default function AppProduction({ initialNews = [] }) {
     return () => { cancelled = true; };
   }, [news]);
 
-  const isHomeView = category === "होम" && !district && !savedOnly && feedType === "latest";
-  const chromeNews = isHomeView ? news : filtered;
-  const breaking = useMemo(() => {
-    const pool = chromeNews.filter(n => n.breaking);
-    return (pool.length ? pool : chromeNews).slice(0, 8);
-  }, [chromeNews]);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (savedOnly) return savedItems.filter(n => !q || [n.title,n.excerpt,n.category,n.location,n.author].join(" ").toLowerCase().includes(q));
@@ -499,6 +493,12 @@ export default function AppProduction({ initialNews = [] }) {
     return feedType === "trending" ? [...result].sort((a,b) => Number(b.views||0) - Number(a.views||0)) : result;
   }, [news, savedItems, category, district, query, savedOnly, feedType]);
   const featured = filtered.find(n => n.featured) || filtered[0] || null, secondary = filtered.filter(n => n.id !== featured?.id).slice(0, 3), latest = filtered.filter(n => n.id !== featured?.id && (category === "होम" ? n.latest !== false : true)), trending = [...news].sort((a, b) => b.views - a.views).slice(0, 5);
+  const isHomeView = category === "होम" && !district && !savedOnly && feedType === "latest";
+  const chromeNews = isHomeView ? news : filtered;
+  const breaking = useMemo(() => {
+    const pool = chromeNews.filter(n => n.breaking);
+    return (pool.length ? pool : chromeNews).slice(0, 8);
+  }, [chromeNews]);
   const sectionTitle = district ? `${district} की खबरें` : savedOnly ? "सेव की गई खबरें" : feedType === "breaking" ? "ब्रेकिंग न्यूज़" : feedType === "trending" ? "ट्रेंडिंग खबरें" : feedType === "video" ? "वीडियो न्यूज़" : feedType === "photo" ? "फोटो न्यूज़" : category === "होम" ? "राजस्थान की ताज़ा खबरें" : `${category} की खबरें`;
 
   function selectCategory(value) { if (value === "सभी जिले") { setDistrictMenuOpen(true); setCategory("होम"); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(true); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); return; } setDistrictMenuOpen(false); setCategory(value); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(false); setSearchOpen(false); try { const u = new URL(window.location.href); u.searchParams.delete("section"); if (value !== "होम") u.searchParams.set("section", value); window.history.replaceState({}, "", u.pathname + (u.search || "")); } catch {} window.scrollTo({ top: 0, behavior: "smooth" }); }
