@@ -20,6 +20,14 @@ button,a{touch-action:manipulation}
 .breaking-inner>b{flex:none}
 .ad-slot{min-height:0}
 .ad-slot:empty{display:none}
+.device-ad-rail{width:100%;margin:8px 0 14px}
+.device-ad-rail:empty{display:none}
+.mobile-ad-slot,.desktop-ad-slot{width:100%}
+@media (min-width:768px){.mobile-ad-slot{display:none}.desktop-ad-slot{display:block}}
+@media (max-width:767px){.desktop-ad-slot{display:none}.mobile-ad-slot{display:block}}
+.ad-live{display:block;overflow:hidden;border-radius:14px;background:transparent;text-decoration:none}
+.ad-live img,.ad-live video{display:block;width:100%;height:auto;max-height:320px;object-fit:cover}
+.ad-live span{display:block;padding:8px;text-align:center;color:inherit}
 .quick-tools{max-width:900px}
 .quick-tool{min-height:48px}
 .hero-grid{align-items:stretch}
