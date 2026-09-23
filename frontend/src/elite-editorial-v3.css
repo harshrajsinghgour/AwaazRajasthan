@@ -1,0 +1,148 @@
+/* Awaaz Rajasthan — V3 editorial polish
+   Cleaner hierarchy, quieter UI chrome, premium newsroom feel. */
+
+:root{
+  --v3-bg:#f7f8fa;
+  --v3-surface:#fff;
+  --v3-ink:#101820;
+  --v3-muted:#687483;
+  --v3-line:#e4e8ed;
+  --v3-red:#c9141c;
+  --v3-navy:#071a2a;
+  --v3-gold:#caa55a;
+  --v3-shadow:0 10px 34px rgba(12,28,43,.055);
+}
+body{background:var(--v3-bg)!important;color:var(--v3-ink)}
+.site-header{
+  position:sticky!important;top:0;z-index:80;
+  box-shadow:0 1px 0 rgba(7,26,42,.08),0 8px 24px rgba(7,26,42,.045)!important;
+}
+.header-top{max-width:1320px!important}
+.category-nav{box-shadow:inset 0 1px rgba(255,255,255,.05)!important}
+.category-scroll{max-width:1320px!important}
+.category-scroll button{white-space:nowrap!important}
+.category-scroll button:not(.active) svg,
+.category-scroll button:not(.active)::first-letter{opacity:.72}
+.breaking-bar{position:relative;z-index:50}
+.breaking-inner{max-width:1320px!important}
+.breaking-inner>b{
+  font-size:0!important;min-width:66px;justify-content:center;
+}
+.breaking-inner>b::before{
+  content:"LIVE";
+  font-size:9px;
+  letter-spacing:1.2px;
+  font-weight:950;
+  color:#fff;
+}
+.breaking-inner>b::after{
+  content:"";
+  width:6px;height:6px;border-radius:50%;
+  background:#fff;box-shadow:0 0 0 4px rgba(255,255,255,.13);
+  margin-left:6px;
+}
+.main-content{max-width:1320px!important}
+.welcome-row{padding-top:3px}
+.welcome-row h1{letter-spacing:-.9px!important}
+.quick-tools .quick-tool{
+  position:relative;
+  overflow:hidden;
+  min-height:56px!important;
+  justify-content:flex-start!important;
+  padding:0 14px!important;
+}
+.quick-tools .quick-tool::before{
+  content:"";
+  width:30px;height:30px;border-radius:9px;
+  display:block;flex:0 0 30px;
+  background:#f2f4f6;
+  box-shadow:inset 0 0 0 1px #e8ebef;
+}
+.quick-tools .quick-tool:nth-child(1)::before{content:"AD";display:grid;place-items:center;font:900 9px/1 Arial;color:var(--v3-red)}
+.quick-tools .quick-tool:nth-child(2)::before{content:"EP";display:grid;place-items:center;font:900 9px/1 Arial;color:var(--v3-navy)}
+.quick-tools .quick-tool:nth-child(3)::before{content:"•";display:grid;place-items:center;font:900 19px/1 Arial;color:var(--v3-red)}
+.quick-tools .quick-tool:nth-child(4)::before{content:"+";display:grid;place-items:center;font:800 18px/1 Arial;color:var(--v3-navy)}
+.quick-tools .quick-tool{font-size:0!important}
+.quick-tools .quick-tool span{font-size:12px!important}
+.news-type-nav{border-bottom:1px solid var(--v3-line);padding-bottom:9px!important}
+.news-type-nav button{
+  font-size:0!important;
+  padding:7px 13px!important;
+}
+.news-type-nav button span{font-size:11px!important}
+.news-type-nav button.active{
+  box-shadow:0 4px 12px rgba(201,20,28,.14)!important;
+}
+.hero-card{overflow:hidden!important}
+.hero-image-wrap{height:405px!important}
+.hero-copy h2{max-width:900px}
+.hero-card,.compact-card,.latest-section,.side-card,.district-section{
+  box-shadow:var(--v3-shadow)!important;
+}
+.compact-card{overflow:hidden!important}
+.compact-card .news-kicker,.hero-copy .news-kicker{letter-spacing:.25px}
+.latest-section{padding-top:19px!important}
+.section-heading h2{letter-spacing:-.3px}
+.news-row{min-height:140px}
+.news-row> .news-media-frame{overflow:hidden;border-radius:11px}
+.news-row .news-media-image,.compact-card .news-media-image,.hero-image .news-media-image{
+  transition:transform .35s ease;
+}
+.news-row:hover .news-media-image,.compact-card:hover .news-media-image,.hero-card:hover .news-media-image{transform:scale(1.025)}
+.row-top span{
+  color:var(--v3-red)!important;
+  font-weight:900!important;
+}
+.row-top small{padding-left:7px;border-left:1px solid #d9dee4}
+.side-title h3{font-size:0!important}
+.side-title h3::after{font-size:15px;font-weight:950}
+.side-card:nth-child(2) .side-title h3::after{content:"ट्रेंडिंग"}
+.side-card:nth-child(3) .side-title h3::after{content:"जिला चुनें"}
+.trend-item b{font-variant-numeric:tabular-nums}
+.ad-slot{min-height:70px!important}
+.side-ad{min-height:250px!important}
+.district-grid button{transition:background .16s ease,border-color .16s ease,transform .16s ease!important}
+.district-grid button:hover{transform:translateY(-1px)}
+.site-footer{margin-top:34px!important}
+.mobile-bottom-nav{z-index:120!important}
+.mobile-bottom-nav button{font-weight:800!important}
+.mobile-bottom-nav button.active{transform:translateY(-1px)}
+
+@media(min-width:768px){
+  .header-top{height:82px!important}
+  .brand-logo-image{width:56px!important;height:56px!important}
+  .brand strong{font-size:23px!important}
+  .category-scroll button{min-height:43px}
+  .welcome-row{margin-top:14px!important}
+  .quick-tools{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .hero-grid{grid-template-columns:minmax(0,1.65fr) minmax(350px,.8fr)!important}
+  .secondary-grid{grid-template-rows:repeat(3,1fr)!important}
+  .compact-card{min-height:126px!important}
+  .content-layout{grid-template-columns:minmax(0,1fr) 320px!important}
+}
+
+@media(max-width:767px){
+  .site-header{position:sticky!important}
+  .header-top{padding-inline:10px!important}
+  .category-nav{overflow:hidden}
+  .breaking-inner{padding-inline:10px!important}
+  .main-content{padding-inline:10px!important}
+  .quick-tools .quick-tool{min-height:52px!important;padding:0 9px!important}
+  .quick-tools .quick-tool::before{width:26px;height:26px;flex-basis:26px}
+  .quick-tools .quick-tool span{font-size:10px!important}
+  .news-type-nav{margin-inline:0!important}
+  .hero-image-wrap{height:238px!important}
+  .hero-copy h2{font-size:21px!important;letter-spacing:-.2px!important}
+  .latest-section{padding-inline:11px!important}
+  .news-row{min-height:0!important}
+  .news-row> .news-media-frame{height:84px!important}
+  .news-row .news-media-image{height:84px!important}
+  .side-ad{display:none!important}
+}
+@media(max-width:390px){
+  .quick-tools .quick-tool span{font-size:9px!important}
+  .quick-tools .quick-tool{padding-inline:6px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .news-row .news-media-image,.compact-card .news-media-image,.hero-image .news-media-image{transition:none!important}
+}
