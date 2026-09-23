@@ -3,6 +3,26 @@ import ClientApp from "../ClientApp";
 const BACKEND = String(process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://awaazrajasthan.onrender.com").replace(/\/$/, "");
 const SITE = String(process.env.NEXT_PUBLIC_SITE_URL || "https://awaazrajasthan.vercel.app").replace(/\/$/, "");
 
+function publicMediaUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw, SITE);
+    if (parsed.pathname.startsWith("/api/media/")) return `${SITE}${parsed.pathname}${parsed.search}`;
+    return raw;
+  } catch {
+    return raw;
+  }
+}
+function sanitizeNewsMedia(item) {
+  if (!item || typeof item !== "object") return item;
+  return {
+    ...item,
+    image: Array.isArray(item.image) ? item.image.map(publicMediaUrl).filter(Boolean) : publicMediaUrl(item.image),
+    video: publicMediaUrl(item.video)
+  };
+}
+
 async function getHomeNews() {
   try {
     const response = await fetch(`${BACKEND}/api/news?limit=30`, {
@@ -10,7 +30,8 @@ async function getHomeNews() {
     });
     if (!response.ok) return [];
     const data = await response.json();
-    return Array.isArray(data?.news) ? data.news : Array.isArray(data?.data) ? data.data : [];
+    const rows = Array.isArray(data?.news) ? data.news : Array.isArray(data?.data) ? data.data : [];
+    return rows.map(sanitizeNewsMedia);
   } catch {
     return [];
   }
@@ -23,7 +44,7 @@ async function getArticle(slug) {
     const response = await fetch(`${BACKEND}/api/news/${encodeURIComponent(key)}/preview`, { next: { revalidate: 30, tags: ["news", `news:${key}`] } });
     if (!response.ok) return null;
     const data = await response.json();
-    return data?.news || data?.data || null;
+    return sanitizeNewsMedia(data?.news || data?.data || null);
   } catch { return null; }
 }
 
