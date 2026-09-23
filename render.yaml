@@ -45,10 +45,11 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
-      - key: UPSTASH_REDIS_REST_URL
-        sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: AwaazRajasthan-Redis
+          type: keyvalue
+          property: connectionString
       - key: MEILI_URL
         sync: false
       - key: MEILI_MASTER_KEY
@@ -79,3 +80,15 @@ services:
         value: "10"
       - key: PUSH_WORKER_CLAIM_TIMEOUT_MS
         value: "600000"
+      - key: REDIS_URL
+        fromService:
+          name: AwaazRajasthan-Redis
+          type: keyvalue
+          property: connectionString
+
+  - type: keyvalue
+    name: AwaazRajasthan-Redis
+    plan: free
+    region: singapore
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
