@@ -243,6 +243,19 @@ async function meiliIndexDocuments(rows){
   const r=await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/documents?primaryKey=_id`,{method:"POST",body:JSON.stringify(rows.map(meiliDoc))});
   return Boolean(r?.taskUid);
 }
+async function ensureMeiliIndex(){
+  if(!MEILI_ENABLED)return false;
+  try{
+    await meiliRequest("/indexes",{method:"POST",body:JSON.stringify({uid:MEILI_INDEX,primaryKey:"_id"})});
+    await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/settings`,{method:"PATCH",body:JSON.stringify({
+      searchableAttributes:["title","excerpt","content","category","location"],
+      filterableAttributes:["category","location","publishedAt"],
+      sortableAttributes:["publishedAt"],
+      displayedAttributes:["_id","title","excerpt","content","category","location","publishedAt","slug"]
+    })});
+    return true;
+  }catch(e){console.warn("Meilisearch setup skipped:",e?.message||e);return false;}
+}
 
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
 async function storeUploadedFile(file,folder){
@@ -616,6 +629,6 @@ async function bootstrap(){if(!process.env.MONGODB_URI){if(PROD)throw new Error(
  maxIdleTimeMS:60000,
  waitQueueTimeoutMS:10000,
  heartbeatFrequencyMS:10000
-});await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,HomeNavButton,LegalSettings,Grievance,AdPrice,AdminOtp].map(model=>model.createIndexes()));const missingShareCodes=await News.find({status:"published",$or:[{shareCode:{$exists:false}},{shareCode:""}]}).select("_id").limit(5000).lean();for(const row of missingShareCodes){for(let i=0;i<8;i++){const code=makeShareCode();try{const r=await News.updateOne({_id:row._id, $or:[{shareCode:{$exists:false}},{shareCode:""}]},{$set:{shareCode:code}});if(r.modifiedCount)break;}catch(e){if(i===7)console.error("shareCode backfill failed",e);}}}await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));
+});await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,HomeNavButton,LegalSettings,Grievance,AdPrice,AdminOtp].map(model=>model.createIndexes()));await ensureMeiliIndex();const missingShareCodes=await News.find({status:"published",$or:[{shareCode:{$exists:false}},{shareCode:""}]}).select("_id").limit(5000).lean();for(const row of missingShareCodes){for(let i=0;i<8;i++){const code=makeShareCode();try{const r=await News.updateOne({_id:row._id, $or:[{shareCode:{$exists:false}},{shareCode:""}]},{$set:{shareCode:code}});if(r.modifiedCount)break;}catch(e){if(i===7)console.error("shareCode backfill failed",e);}}}await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));
 const defaultHomeButtons=[["ताज़ा खबरें","🕒","latest","",1],["ब्रेकिंग न्यूज़","🔴","breaking","",2],["ट्रेंडिंग","🔥","trending","",3],["वीडियो","▶️","video","",4],["फोटो","📷","photo","",5]];await Promise.all(defaultHomeButtons.map(([label,icon,action,category,sortOrder])=>HomeNavButton.updateOne({action,label},{$setOnInsert:{label,icon,action,category,sortOrder,active:true}},{upsert:true})));const email=String(process.env.OWNER_EMAIL||"harshrajsinghgour1@gmail.com").toLowerCase().trim(),password=String(process.env.OWNER_PASSWORD||"");if(email&&password){let primaryOwner=await Admin.findOne({role:"owner",ownerType:"primary"});if(!primaryOwner){const configured=await Admin.findOne({email});if(configured){if(configured.role!=="owner")configured.role="owner";configured.ownerType="primary";if(!Array.isArray(configured.permissions)||!configured.permissions.length)configured.permissions=["news:read","news:write","news:delete","media:write"];if(!configured.passwordHash)configured.passwordHash=await bcrypt.hash(password,12);await configured.save();primaryOwner=configured;}else{const hash=await bcrypt.hash(password,12);primaryOwner=await Admin.create({name:"harshraj singh gour",email,passwordHash:hash,role:"owner",ownerType:"primary",permissions:["news:read","news:write","news:delete","media:write"],active:true,sessionVersion:0});}}if(primaryOwner.role!=="owner")primaryOwner.role="owner";if(primaryOwner.ownerType!=="primary")primaryOwner.ownerType="primary";if(!primaryOwner.passwordHash)primaryOwner.passwordHash=await bcrypt.hash(password,12);await primaryOwner.save();}const b2Status=await verifyB2Storage();if(PROD&&!b2Status.ok)console.error(`B2 storage verification warning: ${b2Status.reason}`);app.listen(PORT,async()=>{ console.log(`Awaaz Rajasthan API listening on ${PORT}`); console.log(`MongoDB pool: min=${process.env.MONGO_MIN_POOL_SIZE||5} max=${process.env.MONGO_MAX_POOL_SIZE||50}`); console.log(`B2 storage: ${b2Status.ok?"READY":b2Status.reason}`); if(process.env.ENABLE_PUSH_WORKER!=="false" && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT){ const worker=spawn(process.execPath,[path.join(path.dirname(process.argv[1]),"push-worker.js")],{stdio:"inherit",env:process.env}); worker.on("exit",(code,signal)=>console.log(`Push worker exited: code=${code??""} signal=${signal??""}`)); worker.on("error",error=>console.error("Push worker process error:",error)); } else console.log("Push worker not started: VAPID configuration is not complete or ENABLE_PUSH_WORKER=false"); });}
 bootstrap().catch(e=>{console.error(e);process.exit(1);});
