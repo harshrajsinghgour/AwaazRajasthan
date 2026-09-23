@@ -1,9 +1,9 @@
 {
   "id": "/",
-  "name": "आवाज़ राजस्थान",
-  "short_name": "आवाज़ राजस्थान",
-  "description": "राजस्थान की ताज़ा, स्थानीय और विश्वसनीय खबरें",
-  "lang": "hi-IN",
+  "name": "Awaaz Rajasthan",
+  "short_name": "Awaaz Rajasthan",
+  "description": "Rajasthan ki taza, local aur vishwasniya khabrein",
+  "lang": "en-IN",
   "dir": "ltr",
   "start_url": "/",
   "scope": "/",
@@ -11,7 +11,11 @@
   "orientation": "portrait-primary",
   "background_color": "#f4f5f7",
   "theme_color": "#07111f",
-  "categories": ["news", "regional", "politics"],
+  "categories": [
+    "news",
+    "regional",
+    "politics"
+  ],
   "prefer_related_applications": false,
   "icons": [
     {
