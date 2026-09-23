@@ -198,6 +198,27 @@ const normalizeDate=v=>{if(v===undefined||v===null||v==="")return null;const d=n
 const validateAdDates=(start,end)=>{const s=normalizeDate(start),e=normalizeDate(end);if((start!==undefined&&start!==null&&start!==""&&!s)||(end!==undefined&&end!==null&&end!==""&&!e))return {error:"Invalid ad schedule date"};if(s&&e&&s>e)return {error:"Ad start date must be before or equal to end date"};return {start:s,end:e};};
 const boundedText=(value,max)=>String(value??"").trim().slice(0,max);
 const publicCache=(res,seconds=15,stale=60)=>res.set("Cache-Control",`public, max-age=${seconds}, stale-while-revalidate=${stale}`);
+const REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\\/$/,"");
+const REDIS_TOKEN=String(process.env.UPSTASH_REDIS_REST_TOKEN||"").trim();
+const REDIS_ENABLED=Boolean(REDIS_URL&&REDIS_TOKEN);
+async function redisCommand(command){
+  if(!REDIS_ENABLED)return null;
+  try{
+    const r=await fetch(REDIS_URL,{method:"POST",headers:{"Authorization":`Bearer ${REDIS_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify(command)});
+    if(!r.ok)return null;
+    const data=await r.json();
+    return data?.result ?? null;
+  }catch{return null;}
+}
+async function redisGetJson(key){
+  const raw=await redisCommand(["GET",key]);
+  if(!raw)return null;
+  try{return JSON.parse(raw);}catch{return null;}
+}
+async function redisSetJson(key,value,ttl=15){
+  await redisCommand(["SET",key,JSON.stringify(value),"EX",String(ttl)]);
+}
+
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
 async function storeUploadedFile(file,folder){
  if(!file) throw new Error("File required");
@@ -296,7 +317,36 @@ app.get("/",(_r,res)=>res.json({ok:true,service:"awaaz-rajasthan-api",message:"A
 app.get("/api/health",(_r,res)=>{const database=mongoose.connection.readyState===1?"connected":"disconnected";const ok=database==="connected";res.status(ok?200:503).json({ok,database,service:"awaaz-rajasthan-api",time:new Date().toISOString()});});
 app.get("/api/notifications/public-key",(_r,res)=>{const key=String(process.env.VAPID_PUBLIC_KEY||"").trim();res.json({publicKey:key});});
 app.get("/api/sitemap.xml",async(_req,res,next)=>{try{const rows=await News.find({status:"published"}).select("slug updatedAt publishedAt createdAt").sort({publishedAt:-1,updatedAt:-1}).limit(5000).lean();const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");const base=String(process.env.PUBLIC_FRONTEND_URL||process.env.FRONTEND_URL||"https://awaazrajasthan.vercel.app").split(",")[0].trim().replace(/\/$/,"");const urls=[`<url><loc>${esc(base)}/</loc></url>`];for(const x of rows){const id=x.slug||"";if(!id)continue;const d=x.updatedAt||x.publishedAt||x.createdAt;if(d)urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc><lastmod>${new Date(d).toISOString()}</lastmod></url>`);else urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc></url>`);}publicCache(res,300,900);res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);}catch(e){next(e);}});
-app.get("/api/news",async(req,res,next)=>{try{const limit=Math.min(Math.max(Number(req.query.limit)||30,1),100),page=Math.min(Math.max(Number(req.query.page)||1,1),1000),f={status:"published"};const category=boundedText(req.query.category,80),location=boundedText(req.query.location,80),q=boundedText(req.query.q,200);if(category&&category!=="होम")f.category=category;if(location)f.location=location;if(q)f.$text={$search:q};if(req.query.featured==="true")f.featured=true;const [items,total]=await Promise.all([News.find(f).sort({featured:-1,publishedAt:-1,createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),News.countDocuments(f)]);res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");res.set("Vercel-CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");res.set("Vercel-Cache-Tag","news");res.json({news:items,data:items,pagination:{page,limit,total,pages:Math.ceil(total/limit)}});}catch(e){next(e);}});
+app.get("/api/sitemap-news.xml",async(_req,res,next)=>{try{
+ const rows=await News.find({status:"published",publishedAt:{$ne:null}}).select("slug title publishedAt updatedAt category").sort({publishedAt:-1}).limit(1000).lean();
+ const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+ const base=String(process.env.PUBLIC_FRONTEND_URL||process.env.FRONTEND_URL||"https://awaazrajasthan.vercel.app").split(",")[0].trim().replace(/\/$/,"");
+ const items=rows.filter(x=>x.slug&&x.publishedAt).map(x=>`<url><loc>${esc(base)}/news/${encodeURIComponent(x.slug)}</loc><news:news><news:publication><news:name>आवाज़ राजस्थान</news:name><news:language>hi</news:language></news:publication><news:publication_date>${new Date(x.publishedAt).toISOString()}</news:publication_date><news:title>${esc(x.title)}</news:title></news:news></url>`).join("");
+ publicCache(res,300,900);res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">${items}</urlset>`);
+ }catch(e){next(e);}});
+app.get("/api/rss.xml",async(_req,res,next)=>{try{
+ const rows=await News.find({status:"published"}).select("slug title excerpt content publishedAt updatedAt category").sort({publishedAt:-1,createdAt:-1}).limit(50).lean();
+ const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+ const base=String(process.env.PUBLIC_FRONTEND_URL||process.env.FRONTEND_URL||"https://awaazrajasthan.vercel.app").split(",")[0].trim().replace(/\/$/,"");
+ const items=rows.map(x=>{const link=x.slug?`${base}/news/${encodeURIComponent(x.slug)}`:base;const d=x.publishedAt||x.updatedAt||new Date();const desc=String(x.excerpt||x.content||"").replace(/<[^>]*>/g,"").slice(0,500);return `<item><title>${esc(x.title)}</title><link>${esc(link)}</link><guid isPermaLink="true">${esc(link)}</guid><pubDate>${new Date(d).toUTCString()}</pubDate><category>${esc(x.category||"राजस्थान")}</category><description>${esc(desc)}</description></item>`;}).join("");
+ publicCache(res,60,300);res.type("application/rss+xml").send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>आवाज़ राजस्थान</title><link>${esc(base)}</link><description>राजस्थान की ताज़ा खबरें</description><language>hi-IN</language>${items}</channel></rss>`);
+ }catch(e){next(e);}});
+app.get("/api/news",async(req,res,next)=>{try{
+ const limit=Math.min(Math.max(Number(req.query.limit)||30,1),100),page=Math.min(Math.max(Number(req.query.page)||1,1),1000);
+ const cacheKey=`awaaz:news:${req.originalUrl}`;
+ const cached=await redisGetJson(cacheKey);
+ if(cached){res.set("X-Awaaz-Cache","HIT");res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");return res.json(cached);}
+ const f={status:"published"};const category=boundedText(req.query.category,80),location=boundedText(req.query.location,80),q=boundedText(req.query.q,200);
+ if(category&&category!=="होम")f.category=category;if(location)f.location=location;if(q)f.$text={$search:q};if(req.query.featured==="true")f.featured=true;
+ const [items,total]=await Promise.all([News.find(f).sort({featured:-1,publishedAt:-1,createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),News.countDocuments(f)]);
+ const payload={news:items,data:items,pagination:{page,limit,total,pages:Math.ceil(total/limit)}};
+ await redisSetJson(cacheKey,payload,15);
+ res.set("X-Awaaz-Cache",REDIS_ENABLED?"MISS":"DISABLED");
+ res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");
+ res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");
+ res.set("Vercel-CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");
+ res.set("Vercel-Cache-Tag","news");res.json(payload);
+ }catch(e){next(e);}});
 app.get("/api/news/:id/preview",async(req,res,next)=>{try{const key=boundedText(req.params.id,180);const item=mongoose.isValidObjectId(key)?await News.findOne({_id:key,status:"published"}).lean():await News.findOne({$or:[{slug:key},{shareCode:key}],status:"published"}).lean();if(!item)return res.status(404).json({message:"News not found"});res.set("Cache-Control","public, max-age=60, s-maxage=300, stale-while-revalidate=900");res.json({news:item,data:item});}catch(e){next(e);}});
 app.get("/api/news/:id",async(req,res,next)=>{try{const key=boundedText(req.params.id,180);const query=mongoose.isValidObjectId(key)?{_id:key,status:"published"}:{ $or:[{slug:key},{shareCode:key}],status:"published"};const item=await News.findOneAndUpdate(query,{$inc:{views:1}},{new:true}).lean();if(!item)return res.status(404).json({message:"News not found"});res.json({news:item,data:item});}catch(e){next(e);}});
 app.get("/api/categories",async(_r,res,next)=>{try{const rows=await Category.find({active:true}).sort({sortOrder:1,name:1}).lean();
