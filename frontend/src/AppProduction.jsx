@@ -473,7 +473,7 @@ export default function AppProduction() {
         const bytes = Uint8Array.from(atob(base64), ch => ch.charCodeAt(0));
         subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes });
       }
-      const response = await fetch("/api/notifications/subscribe", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(subscription), cache: "no-store" });
+      const response = await fetch("/api/notifications/subscribe", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ ...subscription, district: district || "", category: category === "होम" ? "" : category }), cache: "no-store" });
       if (!response.ok) {
         let detail = "";
         try { const data = await response.json(); detail = String(data?.message || ""); } catch {}
