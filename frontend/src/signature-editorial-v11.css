@@ -1,0 +1,154 @@
+/* Awaaz Rajasthan — Signature Editorial v11
+   Purpose: final visual refinement layer over the existing production system.
+   Keep this file lightweight: no layout rewrite, no dependency, no runtime JS.
+*/
+:root{
+  --ar-ink:#0b1220;
+  --ar-muted:#667085;
+  --ar-line:rgba(15,23,42,.09);
+  --ar-soft:#f6f7f9;
+  --ar-card:#fff;
+  --ar-brand:#c91f2b;
+  --ar-brand-dark:#8f111c;
+  --ar-gold:#b98a2f;
+  --ar-shadow:0 12px 34px rgba(15,23,42,.07);
+  --ar-radius:18px;
+}
+html{scroll-behavior:smooth}
+body{
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  background:var(--ar-soft);
+}
+.awaaz-app{min-height:100dvh;color:var(--ar-ink)}
+.container{width:min(1240px,calc(100% - 32px));margin-inline:auto}
+.site-header{
+  position:sticky;top:0;z-index:70;
+  backdrop-filter:saturate(150%) blur(16px);
+  -webkit-backdrop-filter:saturate(150%) blur(16px);
+}
+.header-top{
+  min-height:72px;
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+}
+.brand{min-width:0}
+.brand-logo-image{object-fit:contain}
+.brand strong{letter-spacing:-.02em}
+.brand small{color:var(--ar-muted)}
+.header-actions{display:flex;align-items:center;gap:6px}
+.icon-btn,.quick-tool,.news-type-nav button,.category-nav button{
+  -webkit-tap-highlight-color:transparent;
+}
+.icon-btn:focus-visible,.quick-tool:focus-visible,.news-type-nav button:focus-visible,
+.category-nav button:focus-visible,.news-row:focus-visible,.compact-card:focus-visible,
+.trend-item:focus-visible,.district-grid button:focus-visible{
+  outline:3px solid rgba(201,31,43,.24);outline-offset:3px;
+}
+.category-scroll{scrollbar-width:none}
+.category-scroll::-webkit-scrollbar{display:none}
+.breaking-bar{border-block:1px solid rgba(201,31,43,.12)}
+.breaking-inner{min-height:40px}
+.ticker-track{mask-image:linear-gradient(90deg,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%)}
+.main-content{padding-top:18px;padding-bottom:56px}
+.welcome-row{align-items:end;gap:20px}
+.welcome-row h1{letter-spacing:-.035em;line-height:1.08}
+.welcome-row p{color:var(--ar-muted)}
+.refresh-btn{border:1px solid var(--ar-line);background:var(--ar-card);box-shadow:0 6px 18px rgba(15,23,42,.05)}
+.quick-tools{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;
+  margin:14px 0 18px;
+}
+.quick-tool{
+  min-height:50px;border:1px solid var(--ar-line);background:rgba(255,255,255,.88);
+  border-radius:14px;padding:10px 12px;display:flex;align-items:center;justify-content:center;
+  gap:8px;font-weight:750;color:inherit;text-decoration:none;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.quick-tool:hover{transform:translateY(-1px);box-shadow:var(--ar-shadow);border-color:rgba(201,31,43,.18)}
+.news-type-nav{
+  display:flex;gap:8px;overflow:auto;padding:2px 1px 10px;scrollbar-width:none;
+}
+.news-type-nav::-webkit-scrollbar{display:none}
+.news-type-nav button{
+  flex:0 0 auto;border:1px solid var(--ar-line);background:var(--ar-card);
+  border-radius:999px;padding:9px 14px;font-weight:750;color:#344054;
+}
+.news-type-nav button.active{background:var(--ar-ink);color:#fff;border-color:var(--ar-ink)}
+.hero-card,.compact-card,.news-row,.side-card,.district-section{
+  border:1px solid var(--ar-line);
+  box-shadow:0 7px 24px rgba(15,23,42,.045);
+}
+.hero-card,.compact-card,.news-row,.side-card{background:var(--ar-card)}
+.hero-card{border-radius:var(--ar-radius);overflow:hidden}
+.hero-copy h2{letter-spacing:-.03em;line-height:1.12}
+.hero-copy p{color:#5f6b7a}
+.hero-image-wrap{background:#e9edf2}
+.hero-image,.article-cover{background:#e9edf2}
+.compact-card{border-radius:16px;overflow:hidden}
+.compact-card h3,.news-row h3{letter-spacing:-.018em;line-height:1.28}
+.news-row{border-radius:16px;overflow:hidden;transition:transform .18s ease,box-shadow .18s ease}
+.news-row:hover{transform:translateY(-1px);box-shadow:var(--ar-shadow)}
+.news-row-copy p{color:#697586}
+.news-kicker,.section-label{letter-spacing:.08em}
+.section-heading{align-items:end}
+.section-heading h2{letter-spacing:-.025em}
+.count{color:var(--ar-muted)}
+.side-card{border-radius:16px}
+.side-title{border-bottom:1px solid var(--ar-line)}
+.trend-item{border-bottom:1px solid var(--ar-line)}
+.trend-item:last-child{border-bottom:0}
+.trend-item b{color:var(--ar-brand);font-variant-numeric:tabular-nums}
+.district-section{background:var(--ar-card);border-radius:var(--ar-radius);padding:20px}
+.district-grid button{min-height:42px;border:1px solid var(--ar-line);background:#fff;border-radius:12px;font-weight:700}
+.district-grid button:hover,.district-grid button.active{border-color:rgba(201,31,43,.35);color:var(--ar-brand);background:rgba(201,31,43,.045)}
+.empty-state,.load-error{border:1px dashed rgba(15,23,42,.16);background:rgba(255,255,255,.7);border-radius:16px}
+.search-panel{margin-top:12px}
+.search-box{border:1px solid var(--ar-line);box-shadow:var(--ar-shadow)}
+.article-backdrop{backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.article-modal{border:1px solid var(--ar-line);box-shadow:0 24px 80px rgba(2,6,23,.2)}
+.article-content h1{letter-spacing:-.04em;line-height:1.08}
+.article-lead{font-size:1.12rem;line-height:1.8;color:#475467}
+.article-body p{font-size:1.05rem;line-height:1.9;color:#253041}
+.article-toolbar{position:sticky;top:0;z-index:4;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.site-footer{border-top:1px solid var(--ar-line)}
+.mobile-bottom-nav{
+  padding-bottom:max(8px,env(safe-area-inset-bottom));
+}
+.to-top{box-shadow:0 10px 28px rgba(15,23,42,.18)}
+@media (max-width:767px){
+  .container{width:min(100% - 20px,680px)}
+  .header-top{min-height:62px}
+  .main-content{padding-top:10px;padding-bottom:92px}
+  .welcome-row{align-items:flex-start}
+  .welcome-row h1{font-size:clamp(1.65rem,7vw,2.15rem)}
+  .welcome-row .refresh-btn{flex:0 0 auto}
+  .quick-tools{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .quick-tool{min-height:46px;font-size:.9rem;border-radius:13px}
+  .hero-copy{padding:15px}
+  .hero-copy h2{font-size:1.42rem}
+  .news-row{border-radius:14px}
+  .news-row-copy{min-width:0}
+  .news-row h3{font-size:1rem}
+  .news-row-copy p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .district-section{padding:14px;border-radius:16px}
+  .article-content h1{font-size:clamp(1.75rem,8vw,2.4rem)}
+  .article-body p{font-size:1rem;line-height:1.82}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+html[data-theme="dark"]{
+  --ar-ink:#f7f8fa;--ar-muted:#aab3c0;--ar-line:rgba(255,255,255,.1);
+  --ar-soft:#0b1220;--ar-card:#111927;
+}
+html[data-theme="dark"] .quick-tool,
+html[data-theme="dark"] .news-type-nav button,
+html[data-theme="dark"] .district-grid button,
+html[data-theme="dark"] .refresh-btn,
+html[data-theme="dark"] .empty-state,
+html[data-theme="dark"] .load-error{background:#111927;color:#f7f8fa}
+html[data-theme="dark"] .news-row-copy p,
+html[data-theme="dark"] .hero-copy p,
+html[data-theme="dark"] .article-lead,
+html[data-theme="dark"] .article-body p{color:#c4ccd7}

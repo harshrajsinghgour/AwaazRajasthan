@@ -6,7 +6,11 @@ function idFromShortCode(code){try{const s=String(code||"").replace(/-/g,"+").re
 
 const VITE_ENV = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
 const NEXT_PUBLIC_API_URL = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "") : "";
-const API_BASE = (VITE_ENV.DEV ? (VITE_ENV.VITE_API_URL || VITE_ENV.VITE_BACKEND_URL || "http://localhost:5000") : (VITE_ENV.VITE_API_URL || NEXT_PUBLIC_API_URL || "")).replace(/\/$/, "");
+const API_BASE = (() => {
+  const local = VITE_ENV.DEV ? (VITE_ENV.VITE_API_URL || VITE_ENV.VITE_BACKEND_URL || "http://localhost:5000") : (NEXT_PUBLIC_API_URL || "");
+  if (typeof window !== "undefined" && !/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname)) return "";
+  return local.replace(/\/$/, "");
+})();
 const E_PAPER_URL = VITE_ENV.VITE_E_PAPER_URL || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_E_PAPER_URL || "/epaper") : "/epaper");
 const BUILD_VAPID_PUBLIC_KEY = VITE_ENV.VITE_VAPID_PUBLIC_KEY || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "") : "");
 
@@ -311,15 +315,17 @@ export default function AppProduction({ initialNews = [] }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/home-buttons`, { headers: { Accept: "application/json" } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => { const rows = Array.isArray(data?.buttons) ? data.buttons.filter(x => x && x.active !== false) : []; if (!cancelled && rows.length) setHomeButtons(rows); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const timer = window.setTimeout(() => {
+      fetch(`${API_BASE}/api/home-buttons`, { headers: { Accept: "application/json" } })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { const rows = Array.isArray(data?.buttons) ? data.buttons.filter(x => x && x.active !== false) : []; if (!cancelled && rows.length) setHomeButtons(rows); })
+        .catch(() => {});
+    }, 1200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, []);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
+    const timer = window.setTimeout(() => fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
@@ -333,18 +339,18 @@ export default function AppProduction({ initialNews = [] }) {
           setCategories(["होम", ...desired, ...rest]);
         }
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => {}), 1200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, []);
   const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
   useEffect(() => {
     if (vapidPublicKey) return;
     let cancelled = false;
-    fetch(`${API_BASE}/api/notifications/public-key`, { headers: { Accept: "application/json" } })
+    const timer = window.setTimeout(() => fetch(`${API_BASE}/api/notifications/public-key`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { if (!cancelled && data?.publicKey) setVapidPublicKey(String(data.publicKey).trim()); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => {}), 1500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [vapidPublicKey]);
 
   useEffect(() => { document.documentElement.lang = "hi"; document.documentElement.dataset.theme = dark ? "dark" : "light"; writeStorage("awaaz-theme", dark ? "dark" : "light"); }, [dark]);
@@ -476,7 +482,28 @@ export default function AppProduction({ initialNews = [] }) {
 
   function selectCategory(value) { if (value === "सभी जिले") { setDistrictMenuOpen(true); setCategory("होम"); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(true); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); return; } setDistrictMenuOpen(false); setCategory(value); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(false); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function toggleSave(id) { const key = String(id); const exists = saved.includes(key); if (exists) { const nextSaved = saved.filter(x => String(x) !== key); const nextItems = savedItems.filter(x => String(x.id || x._id) !== key); setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव से हटाई गई"); } else { const item = news.find(n => String(n.id || n._id) === key) || (article && String(article.id || article._id) === key ? article : null); if (!item) return; const nextSaved = [key, ...saved.filter(x => String(x) !== key)]; const nextItems = [item, ...savedItems.filter(x => String(x.id || x._id) !== key)]; setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव हो गई"); } }
-  async function share(item) { const id = String(item?.id || item?._id || "").trim(); if (!id) return; const code = String(item?.shareCode || shortCodeFromId(id) || "").trim(); const url = `${window.location.origin}/news/${encodeURIComponent(code || id)}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.excerpt || "आवाज़ राजस्थान की खबर", url }); else { await navigator.clipboard.writeText(url); setToast("लिंक कॉपी हो गया"); } } catch {} }
+  async function share(item) {
+    const id = String(item?.id || item?._id || "").trim();
+    if (!id) return;
+    const code = String(item?.shareCode || shortCodeFromId(id) || "").trim();
+    const url = `${window.location.origin}/news/${encodeURIComponent(code || id)}`;
+    const title = String(item?.title || "आवाज़ राजस्थान की खबर").trim();
+    const location = String(item?.location || "").trim();
+    const category = String(item?.category || "").trim();
+    const excerpt = String(item?.excerpt || "").replace(/\s+/g, " ").trim();
+    const shareText = [location && `📍 ${location}`, category && `• ${category}`, excerpt || "आवाज़ राजस्थान की ताज़ा खबर"].filter(Boolean).join(" ");
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: shareText, url });
+        setToast("खबर शेयर हो गई");
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(`${title}\n${shareText}\n${url}`);
+        setToast("खबर का प्रीमियम शेयर लिंक कॉपी हो गया");
+      } else {
+        setToast("शेयर लिंक: " + url);
+      }
+    } catch {}
+  }
   async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
   function closeArticle() { setArticle(null); const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
 
