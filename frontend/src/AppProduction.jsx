@@ -348,14 +348,21 @@ export default function AppProduction({ initialNews = [] }) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !("EventSource" in window)) return;
+    let source = null;
     const timer = window.setTimeout(() => {
-    const source = new EventSource(`${API_BASE}/api/news/stream`);
-    const refresh = () => setNewsRefreshKey(v => v + 1);
-    source.addEventListener("news-updated", refresh);
-    source.onerror = () => {};
-    return () => { source.removeEventListener("news-updated", refresh); source.close(); window.clearTimeout(timer); };
+      source = new EventSource(`${API_BASE}/api/news/stream`);
+      const refresh = () => setNewsRefreshKey(v => v + 1);
+      source.addEventListener("news-updated", refresh);
+      source.onerror = () => {};
+      source.__awaazRefresh = refresh;
     }, 15000);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      if (source) {
+        source.removeEventListener("news-updated", source.__awaazRefresh);
+        source.close();
+      }
+    };
   }, []);
   useEffect(() => { const onScroll = () => setShowTop(window.scrollY > 650); const onInstall = e => { e.preventDefault(); setInstallPrompt(e); }; window.addEventListener("scroll", onScroll, { passive: true }); window.addEventListener("beforeinstallprompt", onInstall); const onInstalled = () => { setAppInstalled(true); setInstallPrompt(null); setToast("आवाज़ राजस्थान ऐप सफलतापूर्वक इंस्टॉल हो गया"); }; window.addEventListener("appinstalled", onInstalled); const media = window.matchMedia?.("(display-mode: standalone)"); const onModeChange = () => setAppInstalled(media?.matches || window.navigator.standalone === true); media?.addEventListener?.("change", onModeChange); return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("appinstalled", onInstalled); media?.removeEventListener?.("change", onModeChange); }; }, []);
   useEffect(() => {
