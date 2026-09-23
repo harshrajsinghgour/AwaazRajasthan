@@ -4,11 +4,11 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 function shortCodeFromId(id){try{const hex=String(id||"").trim();if(!/^[a-fA-F0-9]{24}$/.test(hex))return "";let bin="";for(let i=0;i<24;i+=2)bin+=String.fromCharCode(parseInt(hex.slice(i,i+2),16));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}catch{return "";}}
 function idFromShortCode(code){try{const s=String(code||"").replace(/-/g,"+").replace(/_/g,"/");const bin=atob(s);if(bin.length!==12)return "";let hex="";for(let i=0;i<bin.length;i++)hex+=bin.charCodeAt(i).toString(16).padStart(2,"0");return /^[a-fA-F0-9]{24}$/.test(hex)?hex:"";}catch{return "";}}
 
-const API_BASE = import.meta.env.DEV
-  ? (import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || "http://localhost:5000").replace(/\/$/, "")
-  : "";
-const E_PAPER_URL = import.meta.env.VITE_E_PAPER_URL || "/epaper";
-const BUILD_VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY || "";
+const VITE_ENV = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : {};
+const NEXT_PUBLIC_API_URL = typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "") : "";
+const API_BASE = (VITE_ENV.DEV ? (VITE_ENV.VITE_API_URL || VITE_ENV.VITE_BACKEND_URL || "http://localhost:5000") : (VITE_ENV.VITE_API_URL || NEXT_PUBLIC_API_URL || "")).replace(/\/$/, "");
+const E_PAPER_URL = VITE_ENV.VITE_E_PAPER_URL || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_E_PAPER_URL || "/epaper") : "/epaper");
+const BUILD_VAPID_PUBLIC_KEY = VITE_ENV.VITE_VAPID_PUBLIC_KEY || (typeof process !== "undefined" ? (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "") : "");
 
 const DEFAULT_CATEGORIES = ["होम", "भारत", "विश्व", "राजस्थान", "जयपुर", "जोधपुर", "उदयपुर", "कोटा", "अजमेर", "भीलवाड़ा", "सभी जिले", "अपराध", "राजनीति", "शिक्षा", "नौकरी", "खेल", "मनोरंजन", "बिजनेस"];
 const DEFAULT_HOME_BUTTONS = [{label:"ताज़ा खबरें",icon:"🕒",action:"latest"},{label:"ब्रेकिंग न्यूज़",icon:"🔴",action:"breaking"},{label:"ट्रेंडिंग",icon:"🔥",action:"trending"},{label:"वीडियो",icon:"▶️",action:"video"},{label:"फोटो",icon:"📷",action:"photo"}];
@@ -267,7 +267,7 @@ function EpaperPage() {
 }
 
 export default function AppProduction() {
-  if(window.location.pathname==="/epaper") return <EpaperPage />;
+  if(typeof window!=="undefined" && window.location.pathname==="/epaper") return <EpaperPage />;
   const [news, setNews] = useState(() => readStorageJson("awaaz-news-cache", [])), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
   const [saved, setSaved] = useState(() => {
     try {
@@ -276,7 +276,7 @@ export default function AppProduction() {
       return [...new Set([...bookmarks, ...items.map(x => String(x.id))])];
     } catch { return []; }
   }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
-  const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null), [appInstalled, setAppInstalled] = useState(() => window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true);
+  const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null), [appInstalled, setAppInstalled] = useState(() => typeof window!=="undefined" && (window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true));
   useEffect(() => {
     const section = new URLSearchParams(window.location.search).get("section");
     if (!section) return;
@@ -334,6 +334,15 @@ export default function AppProduction() {
   }, [vapidPublicKey]);
 
   useEffect(() => { document.documentElement.lang = "hi"; document.documentElement.dataset.theme = dark ? "dark" : "light"; writeStorage("awaaz-theme", dark ? "dark" : "light"); }, [dark]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("EventSource" in window)) return;
+    const source = new EventSource(`${API_BASE}/api/news/stream`);
+    const refresh = () => setNewsRefreshKey(v => v + 1);
+    source.addEventListener("news-updated", refresh);
+    source.onerror = () => {};
+    return () => { source.removeEventListener("news-updated", refresh); source.close(); };
+  }, []);
   useEffect(() => { const onScroll = () => setShowTop(window.scrollY > 650); const onInstall = e => { e.preventDefault(); setInstallPrompt(e); }; window.addEventListener("scroll", onScroll, { passive: true }); window.addEventListener("beforeinstallprompt", onInstall); const onInstalled = () => { setAppInstalled(true); setInstallPrompt(null); setToast("आवाज़ राजस्थान ऐप सफलतापूर्वक इंस्टॉल हो गया"); }; window.addEventListener("appinstalled", onInstalled); const media = window.matchMedia?.("(display-mode: standalone)"); const onModeChange = () => setAppInstalled(media?.matches || window.navigator.standalone === true); media?.addEventListener?.("change", onModeChange); return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("appinstalled", onInstalled); media?.removeEventListener?.("change", onModeChange); }; }, []);
   useEffect(() => {
     let cancelled = false;

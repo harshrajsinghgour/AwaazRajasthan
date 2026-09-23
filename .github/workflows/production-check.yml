@@ -29,7 +29,7 @@ jobs:
         run: npm run build
       - name: Validate Vercel configuration
         working-directory: .
-        run: node -e "const fs=require('fs'); const v=JSON.parse(fs.readFileSync('frontend/vercel.json','utf8')); if(!Array.isArray(v.rewrites)||!Array.isArray(v.headers)) throw new Error('Invalid frontend/vercel.json'); if(!v.rewrites.some(x=>x.source==='/news/:path*'&&x.destination==='/index.html')) throw new Error('Article rewrite missing'); console.log('Vercel configuration OK')"
+        run: node -e "const fs=require('fs'); const v=JSON.parse(fs.readFileSync('frontend/vercel.json','utf8')); if(v.framework!=='nextjs'||!Array.isArray(v.rewrites)) throw new Error('Next.js Vercel configuration missing'); if(!v.rewrites.some(x=>x.source==='/api/:path*')) throw new Error('API rewrite missing'); console.log('Next.js Vercel configuration OK')"
       - name: Validate frontend production contracts
         working-directory: .
         run: |
@@ -181,7 +181,7 @@ jobs:
         run: |
           set -euo pipefail
           base="https://awaazrajasthan.vercel.app"
-          for path in / /manifest.webmanifest /robots.txt /sitemap.xml /news/__production_smoke__; do
+          for path in / /manifest.webmanifest /robots.txt /sitemap.xml; do
             code=$(curl -L -sS -o /tmp/response -w '%{http_code}' --max-time 30 "$base$path")
             test "$code" = "200" || { echo "Vercel smoke failed: $path -> $code"; cat /tmp/response; exit 1; }
           done
@@ -189,7 +189,13 @@ jobs:
           curl -L -sS --max-time 30 "$base/robots.txt" | grep -q 'Sitemap:'
           vercel_news=$(curl -L -sS --max-time 30 "$base/api/news?limit=1&_smoke=$(date +%s)")
           echo "$vercel_news" | grep -q '"pagination"'
-          echo "Vercel live shell + API proxy + SEO smoke OK"
+          article_id=$(node -e 'const x=JSON.parse(process.argv[1]); const n=x.news?.[0]; if(n) process.stdout.write(String(n.slug||n._id||""))' "$vercel_news")
+          if [ -n "$article_id" ]; then
+            encoded_id=$(node -e 'process.stdout.write(encodeURIComponent(process.argv[1]))' "$article_id")
+            article_code=$(curl -L -sS -o /tmp/article_response -w '%{http_code}' --max-time 30 "$base/news/$encoded_id")
+            test "$article_code" = "200" || { echo "Vercel article route failed: $article_id -> $article_code"; cat /tmp/article_response; exit 1; }
+          fi
+          echo "Vercel live shell + API proxy + Next.js article SEO smoke OK"
 
   deployment-config:
     name: Deployment configuration

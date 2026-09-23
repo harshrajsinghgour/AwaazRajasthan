@@ -1,11 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
+  "framework": "nextjs",
   "rewrites": [
-    {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    },
     {
       "source": "/api/:path*",
       "destination": "https://awaazrajasthan.onrender.com/api/:path*"
@@ -15,39 +10,12 @@
       "destination": "https://awaazrajasthan.onrender.com/api/sitemap.xml"
     },
     {
-      "source": "/news/:path*",
-      "destination": "/api/share?slug=:path*"
+      "source": "/sitemap-news.xml",
+      "destination": "https://awaazrajasthan.onrender.com/api/sitemap-news.xml"
     },
     {
-      "source": "/n/:path*",
-      "destination": "/api/share?slug=:path*"
-    },
-    {
-      "source": "/s/:path*",
-      "destination": "/api/s/:path*"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/news",
-      "headers": [
-        {
-          "key": "CDN-Cache-Control",
-          "value": "public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400"
-        },
-        {
-          "key": "Vercel-CDN-Cache-Control",
-          "value": "public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400"
-        },
-        {
-          "key": "Vercel-Cache-Tag",
-          "value": "news"
-        }
-      ]
+      "source": "/rss.xml",
+      "destination": "https://awaazrajasthan.onrender.com/api/rss.xml"
     }
   ]
 }

@@ -19,6 +19,7 @@ import nodemailer from "nodemailer";
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PDFDocument, rgb } from "pdf-lib";
+import sharp from "sharp";
 import Razorpay from "razorpay";
 
 const app=express();
@@ -198,6 +199,11 @@ const normalizeDate=v=>{if(v===undefined||v===null||v==="")return null;const d=n
 const validateAdDates=(start,end)=>{const s=normalizeDate(start),e=normalizeDate(end);if((start!==undefined&&start!==null&&start!==""&&!s)||(end!==undefined&&end!==null&&end!==""&&!e))return {error:"Invalid ad schedule date"};if(s&&e&&s>e)return {error:"Ad start date must be before or equal to end date"};return {start:s,end:e};};
 const boundedText=(value,max)=>String(value??"").trim().slice(0,max);
 const publicCache=(res,seconds=15,stale=60)=>res.set("Cache-Control",`public, max-age=${seconds}, stale-while-revalidate=${stale}`);
+const sseClients=new Set();
+function broadcastNewsEvent(type,payload={}){
+  const message=`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for(const client of sseClients){try{client.res.write(message);}catch{sseClients.delete(client);}}
+}
 const REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\/$/,"");
 const REDIS_TOKEN=String(process.env.UPSTASH_REDIS_REST_TOKEN||"").trim();
 const REDIS_ENABLED=Boolean(REDIS_URL&&REDIS_TOKEN);
@@ -238,47 +244,71 @@ async function meiliIndexDocuments(rows){
   const r=await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/documents?primaryKey=_id`,{method:"POST",body:JSON.stringify(rows.map(meiliDoc))});
   return Boolean(r?.taskUid);
 }
+async function ensureMeiliIndex(){
+  if(!MEILI_ENABLED)return false;
+  try{
+    await meiliRequest("/indexes",{method:"POST",body:JSON.stringify({uid:MEILI_INDEX,primaryKey:"_id"})});
+    await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/settings`,{method:"PATCH",body:JSON.stringify({
+      searchableAttributes:["title","excerpt","content","category","location"],
+      filterableAttributes:["category","location","publishedAt"],
+      sortableAttributes:["publishedAt"],
+      displayedAttributes:["_id","title","excerpt","content","category","location","publishedAt","slug"]
+    })});
+    return true;
+  }catch(e){console.warn("Meilisearch setup skipped:",e?.message||e);return false;}
+}
 
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
+async function putB2WithRetry(key,body,contentType){
+ let lastError=null;
+ for(let attempt=1;attempt<=5;attempt+=1){
+  try{
+   await b2.send(new PutObjectCommand({Bucket:B2_BUCKET_NAME,Key:key,Body:body,ContentType:contentType,CacheControl:"public, max-age=31536000, immutable"}));
+   return;
+  }catch(error){
+   lastError=error;
+   const code=String(error?.name||error?.Code||"");
+   console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
+   if(attempt<5)await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt-1)));
+  }
+ }
+ throw lastError||new Error("B2 upload failed");
+}
+function mediaRelative(key){return "/api/media/"+key.split("/").map(encodeURIComponent).join("/");}
 async function storeUploadedFile(file,folder){
  if(!file) throw new Error("File required");
- if(!B2_ENABLED) throw new Error("B2 durable storage is not configured");
- const key=b2ObjectKey(folder,file);
+ if(!B2_ENABLED) throw new Error("B2 durable media storage is not configured");
  try{
-  // Read the temporary multipart file once so a retry can safely resend the body.
-  // Streaming a consumed file can turn transient B2/network timeouts into non-retryable failures.
   const body=await fs.promises.readFile(file.path);
-  let lastError=null;
-  for(let attempt=1;attempt<=5;attempt+=1){
-   try{
-    await b2.send(new PutObjectCommand({
-     Bucket:B2_BUCKET_NAME,
-     Key:key,
-     Body:body,
-     ContentType:file.mimetype,
-     CacheControl:"public, max-age=31536000, immutable"
-    }));
-    lastError=null;
-    break;
-   }catch(error){
-    lastError=error;
-    const code=String(error?.name||error?.Code||"");
-    console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
-    if(attempt<5) await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt-1)));
+  const isOptimizableImage=/^image\/(jpeg|png|webp)$/i.test(String(file.mimetype||""));
+  const variants={};
+  if(isOptimizableImage){
+   const image=sharp(body,{failOn:"none"});
+   for(const width of [480,960,1440]){
+    const key=`${folder}/optimized/${crypto.randomUUID()}-w${width}.webp`;
+    const out=await image.clone().resize({width,withoutEnlargement:true}).webp({quality:78}).toBuffer();
+    await putB2WithRetry(key,out,"image/webp");
+    variants[`w${width}`]=mediaRelative(key);
    }
+   try{
+    const key=`${folder}/optimized/${crypto.randomUUID()}-w1440.avif`;
+    const out=await image.clone().resize({width:1440,withoutEnlargement:true}).avif({quality:55}).toBuffer();
+    await putB2WithRetry(key,out,"image/avif");
+    variants.avif=mediaRelative(key);
+   }catch(error){console.warn("AVIF optimization skipped:",error?.message||error);}
+   const primaryKey=Object.keys(variants).includes("w1440")?variants.w1440:variants.w960;
+   return {key:primaryKey,url:primaryKey,publicUrl:PUBLIC_API_URL+primaryKey,relativeUrl:primaryKey,variants,storage:"b2",optimized:true};
   }
-  if(lastError) throw lastError;
+  const key=b2ObjectKey(folder,file);
+  await putB2WithRetry(key,body,file.mimetype);
+  const relative=mediaRelative(key);
+  return {key,url:relative,publicUrl:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2",optimized:false};
  }catch(error){
   console.error("B2 upload failed:",error?.name||error?.Code||error?.message||error);
   throw new Error("Media could not be stored in Backblaze B2. Please retry the upload.");
  }finally{
   try{await fs.promises.unlink(file.path)}catch{}
  }
- const relative="/api/media/"+key.split("/").map(encodeURIComponent).join("/");
- // Public clients should use the same-origin Vercel proxy. Keep the Render
- // API hostname out of persisted media URLs while retaining the absolute
- // base internally for compatibility/debugging.
- return {key,url:relative,publicUrl:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
 }
 async function getB2SignedUrl(key){
  if(!B2_ENABLED) return null;
@@ -336,6 +366,12 @@ function clearCookie(res){
 app.get("/",(_r,res)=>res.json({ok:true,service:"awaaz-rajasthan-api",message:"Awaaz Rajasthan API is live"}));
 app.get("/api/health",(_r,res)=>{const database=mongoose.connection.readyState===1?"connected":"disconnected";const ok=database==="connected";res.status(ok?200:503).json({ok,database,service:"awaaz-rajasthan-api",time:new Date().toISOString()});});
 app.get("/api/notifications/public-key",(_r,res)=>{const key=String(process.env.VAPID_PUBLIC_KEY||"").trim();res.json({publicKey:key});});
+app.get("/api/news/stream",(req,res)=>{
+  res.status(200);res.set({"Content-Type":"text/event-stream","Cache-Control":"no-cache, no-transform","Connection":"keep-alive","X-Accel-Buffering":"no"});res.flushHeaders?.();
+  const client={res};sseClients.add(client);res.write(`event: ready\ndata: ${JSON.stringify({ok:true,time:new Date().toISOString()})}\n\n`);
+  const heartbeat=setInterval(()=>{try{res.write(": heartbeat\\n\\n");}catch{}},25000);
+  req.on("close",()=>{clearInterval(heartbeat);sseClients.delete(client);});
+});
 app.get("/api/sitemap.xml",async(_req,res,next)=>{try{const rows=await News.find({status:"published"}).select("slug updatedAt publishedAt createdAt").sort({publishedAt:-1,updatedAt:-1}).limit(5000).lean();const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");const base=String(process.env.PUBLIC_FRONTEND_URL||process.env.FRONTEND_URL||"https://awaazrajasthan.vercel.app").split(",")[0].trim().replace(/\/$/,"");const urls=[`<url><loc>${esc(base)}/</loc></url>`];for(const x of rows){const id=x.slug||"";if(!id)continue;const d=x.updatedAt||x.publishedAt||x.createdAt;if(d)urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc><lastmod>${new Date(d).toISOString()}</lastmod></url>`);else urls.push(`<url><loc>${esc(base)}/news/${encodeURIComponent(id)}</loc></url>`);}publicCache(res,300,900);res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);}catch(e){next(e);}});
 app.get("/api/sitemap-news.xml",async(_req,res,next)=>{try{
  const rows=await News.find({status:"published",publishedAt:{$ne:null}}).select("slug title publishedAt updatedAt category").sort({publishedAt:-1}).limit(1000).lean();
@@ -540,9 +576,9 @@ app.post("/api/admin/notifications/send",auth,ownerOnly,async(req,res,next)=>{tr
 app.get("/api/admin/notifications/status",auth,ownerOnly,async(_req,res,next)=>{try{const [active,total,latest]=await Promise.all([Subscriber.countDocuments({active:true}),Subscriber.countDocuments(),Subscriber.findOne({}).sort({createdAt:-1}).select("createdAt active").lean()]);res.json({stats:{active,total,latestSubscribedAt:latest?.createdAt||null,latestActive:latest?.active===true}});}catch(e){next(e);}});
 app.post("/api/admin/notifications/cleanup",auth,ownerOnly,async(_req,res,next)=>{try{const result=await Subscriber.deleteMany({active:false});res.json({ok:true,removed:Number(result.deletedCount||0)});}catch(e){next(e);}});
 app.get("/api/admin/news",auth,permissions("news:read"),async(req,res,next)=>{try{const items=await News.find({}).sort({createdAt:-1}).limit(200).lean();res.json({news:items,data:items});}catch(e){next(e);}});
-app.post("/api/admin/news",auth,permissions("news:write"),async(req,res,next)=>{try{const b=req.body||{},title=String(b.title||"").trim(),category=String(b.category||"राजस्थान"),location=String(b.location||"राजस्थान");if(!title)return res.status(400).json({message:"Title required"});if(!NEWS_CATEGORIES.includes(category)&&!await Category.exists({name:category,active:true}))return res.status(400).json({message:"Invalid news category"});if(!NEWS_DISTRICTS.includes(location))return res.status(400).json({message:"Invalid news district"});if(!adminCanPost(req.admin,category,location))return res.status(403).json({message:"इस admin को इस category/district में खबर publish करने की अनुमति नहीं है।"});let slug=slugify(b.slug||title);if(await News.exists({slug}))slug+=`-${Date.now().toString(36)}`;const status=String(b.status||"published")==="draft"?"draft":"published";const item=await News.create({...b,title,slug,category,location:boundedText(location,80),author:boundedText(b.author||req.admin.name||"आवाज़ राजस्थान",100),status,publishedAt:status==="published"?(b.publishedAt||new Date()):null,pushNotifiedAt:null});res.status(201).json({news:item,push:item.status==="published"&&item.breaking===true?{queued:true}:null});}catch(e){next(e);}});
-app.patch("/api/admin/news/:id",auth,permissions("news:write"),async(req,res,next)=>{try{const allowed=["title","slug","excerpt","content","category","location","image","video","author","status","featured","latest","breaking","publishedAt"],u={};allowed.forEach(k=>{if(req.body?.[k]!==undefined)u[k]=req.body[k]});if(u.title!==undefined){u.title=String(u.title).trim();if(!u.title)return res.status(400).json({message:"Title required"});}if(u.category!==undefined&&!NEWS_CATEGORIES.includes(String(u.category))&&!await Category.exists({name:String(u.category),active:true}))return res.status(400).json({message:"Invalid news category"});if(u.location!==undefined&&!NEWS_DISTRICTS.includes(String(u.location)))return res.status(400).json({message:"Invalid news district"});if(u.location!==undefined)u.location=boundedText(u.location,80);if(u.author!==undefined)u.author=boundedText(u.author,100);const current=await News.findById(req.params.id).select("category location status breaking pushNotifiedAt title excerpt slug").lean();if(!current)return res.status(404).json({message:"News not found"});if(!adminCanPost(req.admin,u.category||current.category,u.location||current.location))return res.status(403).json({message:"इस admin को इस category/district में खबर edit/publish करने की अनुमति नहीं है।"});if(u.status!==undefined&&!['draft','published','archived'].includes(String(u.status)))return res.status(400).json({message:"Invalid news status"});if(u.status==="published"&&!u.publishedAt)u.publishedAt=new Date();if(u.slug!==undefined){u.slug=slugify(u.slug);const clash=await News.findOne({slug:u.slug,_id:{$ne:req.params.id}}).select("_id").lean();if(clash)u.slug=`${u.slug}-${Date.now().toString(36)}`;}const shouldNotify=!current.pushNotifiedAt&&String(u.status??current.status)==="published"&&(u.breaking!==undefined?Boolean(u.breaking):Boolean(current.breaking));const item=await News.findByIdAndUpdate(req.params.id,u,{new:true,runValidators:true});if(!item)return res.status(404).json({message:"News not found"});res.json({news:item,push:shouldNotify?{queued:true}:null});}catch(e){next(e);}});
-app.delete("/api/admin/news/:id",auth,permissions("news:delete"),async(req,res,next)=>{try{const item=await News.findById(req.params.id).select("category location").lean();if(!item)return res.status(404).json({message:"News not found"});if(!adminCanPost(req.admin,item.category,item.location))return res.status(403).json({message:"इस admin को इस category/district में खबर delete करने की अनुमति नहीं है।"});const deleted=await News.findByIdAndDelete(req.params.id);if(!deleted)return res.status(404).json({message:"News not found"});res.json({ok:true});}catch(e){next(e);}});
+app.post("/api/admin/news",auth,permissions("news:write"),async(req,res,next)=>{try{const b=req.body||{},title=String(b.title||"").trim(),category=String(b.category||"राजस्थान"),location=String(b.location||"राजस्थान");if(!title)return res.status(400).json({message:"Title required"});if(!NEWS_CATEGORIES.includes(category)&&!await Category.exists({name:category,active:true}))return res.status(400).json({message:"Invalid news category"});if(!NEWS_DISTRICTS.includes(location))return res.status(400).json({message:"Invalid news district"});if(!adminCanPost(req.admin,category,location))return res.status(403).json({message:"इस admin को इस category/district में खबर publish करने की अनुमति नहीं है।"});let slug=slugify(b.slug||title);if(await News.exists({slug}))slug+=`-${Date.now().toString(36)}`;const status=String(b.status||"published")==="draft"?"draft":"published";const item=await News.create({...b,title,slug,category,location:boundedText(location,80),author:boundedText(b.author||req.admin.name||"आवाज़ राजस्थान",100),status,publishedAt:status==="published"?(b.publishedAt||new Date()):null,pushNotifiedAt:null});if(item.status==="published"){meiliIndexDocuments([item]).catch(e=>console.warn("Meilisearch index failed:",e?.message||e));broadcastNewsEvent("news-updated",{id:String(item._id),slug:item.slug,action:"created"});}res.status(201).json({news:item,push:item.status==="published"&&item.breaking===true?{queued:true}:null});}catch(e){next(e);}});
+app.patch("/api/admin/news/:id",auth,permissions("news:write"),async(req,res,next)=>{try{const allowed=["title","slug","excerpt","content","category","location","image","video","author","status","featured","latest","breaking","publishedAt"],u={};allowed.forEach(k=>{if(req.body?.[k]!==undefined)u[k]=req.body[k]});if(u.title!==undefined){u.title=String(u.title).trim();if(!u.title)return res.status(400).json({message:"Title required"});}if(u.category!==undefined&&!NEWS_CATEGORIES.includes(String(u.category))&&!await Category.exists({name:String(u.category),active:true}))return res.status(400).json({message:"Invalid news category"});if(u.location!==undefined&&!NEWS_DISTRICTS.includes(String(u.location)))return res.status(400).json({message:"Invalid news district"});if(u.location!==undefined)u.location=boundedText(u.location,80);if(u.author!==undefined)u.author=boundedText(u.author,100);const current=await News.findById(req.params.id).select("category location status breaking pushNotifiedAt title excerpt slug").lean();if(!current)return res.status(404).json({message:"News not found"});if(!adminCanPost(req.admin,u.category||current.category,u.location||current.location))return res.status(403).json({message:"इस admin को इस category/district में खबर edit/publish करने की अनुमति नहीं है।"});if(u.status!==undefined&&!['draft','published','archived'].includes(String(u.status)))return res.status(400).json({message:"Invalid news status"});if(u.status==="published"&&!u.publishedAt)u.publishedAt=new Date();if(u.slug!==undefined){u.slug=slugify(u.slug);const clash=await News.findOne({slug:u.slug,_id:{$ne:req.params.id}}).select("_id").lean();if(clash)u.slug=`${u.slug}-${Date.now().toString(36)}`;}const shouldNotify=!current.pushNotifiedAt&&String(u.status??current.status)==="published"&&(u.breaking!==undefined?Boolean(u.breaking):Boolean(current.breaking));const item=await News.findByIdAndUpdate(req.params.id,u,{new:true,runValidators:true});if(!item)return res.status(404).json({message:"News not found"});meiliIndexDocuments([item]).catch(e=>console.warn("Meilisearch index failed:",e?.message||e));broadcastNewsEvent("news-updated",{id:String(item._id),slug:item.slug,action:"updated"});res.json({news:item,push:shouldNotify?{queued:true}:null});}catch(e){next(e);}});
+app.delete("/api/admin/news/:id",auth,permissions("news:delete"),async(req,res,next)=>{try{const item=await News.findById(req.params.id).select("category location").lean();if(!item)return res.status(404).json({message:"News not found"});if(!adminCanPost(req.admin,item.category,item.location))return res.status(403).json({message:"इस admin को इस category/district में खबर delete करने की अनुमति नहीं है।"});const deleted=await News.findByIdAndDelete(req.params.id);if(!deleted)return res.status(404).json({message:"News not found"});if(MEILI_ENABLED){meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/documents/delete/${encodeURIComponent(String(deleted._id))}`,{method:"DELETE"}).catch(()=>{});}broadcastNewsEvent("news-updated",{id:String(deleted._id),action:"deleted"});res.json({ok:true});}catch(e){next(e);}});
 app.get("/api/epapers",async(req,res,next)=>{try{const f={status:"published"};const raw=String(req.query?.date||"").trim();if(raw){if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(raw))return res.status(400).json({message:"Invalid date"});const start=new Date(raw+"T00:00:00.000Z"),end=new Date(start.getTime()+86400000);f.issueDate={$gte:start,$lt:end};}const items=await Epaper.find(f).sort({issueDate:-1,createdAt:-1}).lean();publicCache(res,300,900);res.json({epapers:items,data:items})}catch(e){next(e)}});
 app.get("/api/epapers/:id/download",async(req,res,next)=>{try{const item=await Epaper.findOne({_id:req.params.id,status:"published"}).lean();if(!item)return res.status(404).json({message:"ई-पेपर नहीं मिला।"});const pdf=String(item.pdf||"");if(pdf.startsWith("/api/media/")){if(!B2_ENABLED)return res.status(503).json({message:"B2 storage is not configured"});const key=decodeURIComponent(pdf.replace(/^\/api\/media\//,"")).split("/").map(decodeURIComponent).join("/");if(!key||key.includes("..")||key.startsWith("/")||key.includes("\0"))return res.status(400).json({message:"Invalid media key"});const obj=await b2.send(new GetObjectCommand({Bucket:B2_BUCKET_NAME,Key:key}));res.set("Content-Type","application/pdf");res.set("Content-Disposition",`attachment; filename="awaaz-rajasthan-${new Date(item.issueDate).toISOString().slice(0,10)}.pdf"`);if(obj.ContentLength)res.set("Content-Length",String(obj.ContentLength));return obj.Body.pipe(res)}if(/^https?:\/\//i.test(pdf))return res.redirect(pdf);const filePath=path.join(process.cwd(),pdf.replace(/^\/+/, "").replace(/^epapers[\\/]/,"epapers/"));return res.status(404).json({message:"ई-पेपर B2 media URL उपलब्ध नहीं है।"})}catch(e){next(e)}});
 app.get("/api/epaper/latest",async(_req,res,next)=>{try{const item=await Epaper.findOne({status:"published"}).sort({issueDate:-1,createdAt:-1}).lean();if(!item)return res.status(404).json({message:"ई-पेपर उपलब्ध नहीं है।"});const pdf=String(item.pdf||"");if(!pdf)return res.status(404).json({message:"ई-पेपर PDF उपलब्ध नहीं है।"});if(/^https?:\/\//i.test(pdf))return res.redirect(pdf);if(pdf.startsWith("/api/media/"))return res.redirect(pdf);const filePath=path.join(process.cwd(),pdf.replace(/^\/+/, "").replace(/^epapers[\\/]/,"epapers/"));return res.status(404).json({message:"ई-पेपर B2 media URL उपलब्ध नहीं है।"})}catch(e){next(e)}});
@@ -590,7 +626,7 @@ app.post("/api/admin/upload",auth,permissions("media:write"),upload.single("file
   if(!req.file)return res.status(400).json({message:"File required"});
   const folder=req.file.mimetype==="application/pdf"?"epapers":req.file.mimetype.startsWith("video/")?"videos":"images";
   const stored=await storeUploadedFile(req.file,folder);
-  res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,filename:req.file.filename,mimetype:req.file.mimetype,size:req.file.size,storage:stored.storage});
+  res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,variants:stored.variants||null,optimized:Boolean(stored.optimized),filename:req.file.filename,mimetype:req.file.mimetype,size:req.file.size,storage:stored.storage});
  }catch(e){next(e)}
 });
 app.get("/api/admin/ads/analytics",auth,ownerOnly,async(_r,res,next)=>{try{const ads=await Ad.find({}).select("title position device status startDate endDate impressions clicks createdAt").sort({createdAt:-1}).lean();res.json({analytics:ads.map(a=>({...a,ctr:a.impressions?Number(((a.clicks/a.impressions)*100).toFixed(2)):0}))});}catch(e){next(e);}});
@@ -605,6 +641,6 @@ async function bootstrap(){if(!process.env.MONGODB_URI){if(PROD)throw new Error(
  maxIdleTimeMS:60000,
  waitQueueTimeoutMS:10000,
  heartbeatFrequencyMS:10000
-});await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,HomeNavButton,LegalSettings,Grievance,AdPrice,AdminOtp].map(model=>model.createIndexes()));const missingShareCodes=await News.find({status:"published",$or:[{shareCode:{$exists:false}},{shareCode:""}]}).select("_id").limit(5000).lean();for(const row of missingShareCodes){for(let i=0;i<8;i++){const code=makeShareCode();try{const r=await News.updateOne({_id:row._id, $or:[{shareCode:{$exists:false}},{shareCode:""}]},{$set:{shareCode:code}});if(r.modifiedCount)break;}catch(e){if(i===7)console.error("shareCode backfill failed",e);}}}await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));
+});await Promise.all([News,Ad,AdBooking,Admin,Subscriber,Epaper,Category,HomeNavButton,LegalSettings,Grievance,AdPrice,AdminOtp].map(model=>model.createIndexes()));await ensureMeiliIndex();const missingShareCodes=await News.find({status:"published",$or:[{shareCode:{$exists:false}},{shareCode:""}]}).select("_id").limit(5000).lean();for(const row of missingShareCodes){for(let i=0;i<8;i++){const code=makeShareCode();try{const r=await News.updateOne({_id:row._id, $or:[{shareCode:{$exists:false}},{shareCode:""}]},{$set:{shareCode:code}});if(r.modifiedCount)break;}catch(e){if(i===7)console.error("shareCode backfill failed",e);}}}await Promise.all(DEFAULT_CATEGORY_ROWS.map(([name,icon,sortOrder])=>Category.updateOne({name},{$setOnInsert:{name,icon,sortOrder,active:true}},{upsert:true})));
 const defaultHomeButtons=[["ताज़ा खबरें","🕒","latest","",1],["ब्रेकिंग न्यूज़","🔴","breaking","",2],["ट्रेंडिंग","🔥","trending","",3],["वीडियो","▶️","video","",4],["फोटो","📷","photo","",5]];await Promise.all(defaultHomeButtons.map(([label,icon,action,category,sortOrder])=>HomeNavButton.updateOne({action,label},{$setOnInsert:{label,icon,action,category,sortOrder,active:true}},{upsert:true})));const email=String(process.env.OWNER_EMAIL||"harshrajsinghgour1@gmail.com").toLowerCase().trim(),password=String(process.env.OWNER_PASSWORD||"");if(email&&password){let primaryOwner=await Admin.findOne({role:"owner",ownerType:"primary"});if(!primaryOwner){const configured=await Admin.findOne({email});if(configured){if(configured.role!=="owner")configured.role="owner";configured.ownerType="primary";if(!Array.isArray(configured.permissions)||!configured.permissions.length)configured.permissions=["news:read","news:write","news:delete","media:write"];if(!configured.passwordHash)configured.passwordHash=await bcrypt.hash(password,12);await configured.save();primaryOwner=configured;}else{const hash=await bcrypt.hash(password,12);primaryOwner=await Admin.create({name:"harshraj singh gour",email,passwordHash:hash,role:"owner",ownerType:"primary",permissions:["news:read","news:write","news:delete","media:write"],active:true,sessionVersion:0});}}if(primaryOwner.role!=="owner")primaryOwner.role="owner";if(primaryOwner.ownerType!=="primary")primaryOwner.ownerType="primary";if(!primaryOwner.passwordHash)primaryOwner.passwordHash=await bcrypt.hash(password,12);await primaryOwner.save();}const b2Status=await verifyB2Storage();if(PROD&&!b2Status.ok)console.error(`B2 storage verification warning: ${b2Status.reason}`);app.listen(PORT,async()=>{ console.log(`Awaaz Rajasthan API listening on ${PORT}`); console.log(`MongoDB pool: min=${process.env.MONGO_MIN_POOL_SIZE||5} max=${process.env.MONGO_MAX_POOL_SIZE||50}`); console.log(`B2 storage: ${b2Status.ok?"READY":b2Status.reason}`); if(process.env.ENABLE_PUSH_WORKER!=="false" && process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT){ const worker=spawn(process.execPath,[path.join(path.dirname(process.argv[1]),"push-worker.js")],{stdio:"inherit",env:process.env}); worker.on("exit",(code,signal)=>console.log(`Push worker exited: code=${code??""} signal=${signal??""}`)); worker.on("error",error=>console.error("Push worker process error:",error)); } else console.log("Push worker not started: VAPID configuration is not complete or ENABLE_PUSH_WORKER=false"); });}
 bootstrap().catch(e=>{console.error(e);process.exit(1);});
