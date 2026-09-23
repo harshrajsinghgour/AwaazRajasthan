@@ -218,6 +218,26 @@ async function redisGetJson(key){
 async function redisSetJson(key,value,ttl=15){
   await redisCommand(["SET",key,JSON.stringify(value),"EX",String(ttl)]);
 }
+const MEILI_URL=String(process.env.MEILI_URL||"").trim().replace(/\/$/,"");
+const MEILI_KEY=String(process.env.MEILI_MASTER_KEY||"").trim();
+const MEILI_INDEX=String(process.env.MEILI_INDEX||"awaaz_news").trim()||"awaaz_news";
+const MEILI_ENABLED=Boolean(MEILI_URL&&MEILI_KEY);
+async function meiliRequest(path,options={}){
+  if(!MEILI_ENABLED)return null;
+  try{
+    const r=await fetch(MEILI_URL+path,{...options,headers:{"Authorization":`Bearer ${MEILI_KEY}`,"Content-Type":"application/json",...(options.headers||{})}});
+    if(!r.ok)return null;
+    return await r.json();
+  }catch{return null;}
+}
+function meiliDoc(n){
+  return {_id:String(n._id),title:String(n.title||""),excerpt:String(n.excerpt||""),content:String(n.content||""),category:String(n.category||""),location:String(n.location||""),publishedAt:n.publishedAt||n.createdAt||null,slug:String(n.slug||"")};
+}
+async function meiliIndexDocuments(rows){
+  if(!MEILI_ENABLED||!rows?.length)return false;
+  const r=await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/documents?primaryKey=_id`,{method:"POST",body:JSON.stringify(rows.map(meiliDoc))});
+  return Boolean(r?.taskUid);
+}
 
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
 async function storeUploadedFile(file,folder){
@@ -333,19 +353,23 @@ app.get("/api/rss.xml",async(_req,res,next)=>{try{
  }catch(e){next(e);}});
 app.get("/api/news",async(req,res,next)=>{try{
  const limit=Math.min(Math.max(Number(req.query.limit)||30,1),100),page=Math.min(Math.max(Number(req.query.page)||1,1),1000);
- const cacheKey=`awaaz:news:${req.originalUrl}`;
- const cached=await redisGetJson(cacheKey);
- if(cached){res.set("X-Awaaz-Cache","HIT");res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");return res.json(cached);}
- const f={status:"published"};const category=boundedText(req.query.category,80),location=boundedText(req.query.location,80),q=boundedText(req.query.q,200);
- if(category&&category!=="होम")f.category=category;if(location)f.location=location;if(q)f.$text={$search:q};if(req.query.featured==="true")f.featured=true;
- const [items,total]=await Promise.all([News.find(f).sort({featured:-1,publishedAt:-1,createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),News.countDocuments(f)]);
- const payload={news:items,data:items,pagination:{page,limit,total,pages:Math.ceil(total/limit)}};
- await redisSetJson(cacheKey,payload,15);
- res.set("X-Awaaz-Cache",REDIS_ENABLED?"MISS":"DISABLED");
- res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");
- res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");
- res.set("Vercel-CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");
- res.set("Vercel-Cache-Tag","news");res.json(payload);
+ const category=boundedText(req.query.category,80),location=boundedText(req.query.location,80),q=boundedText(req.query.q,200);
+ const cacheKey=`awaaz:news:${req.originalUrl}`;const cached=await redisGetJson(cacheKey);
+ if(cached){res.set("X-Awaaz-Cache","HIT");res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");return res.json(cached);}
+ let items,total;
+ if(q&&MEILI_ENABLED){
+   const filters=[];if(category&&category!=="होम")filters.push(`category = "${category.replace(/"/g,'\\\"')}"`);if(location)filters.push(`location = "${location.replace(/"/g,'\\\"')}"`);
+   const result=await meiliRequest(`/indexes/${encodeURIComponent(MEILI_INDEX)}/search`,{method:"POST",body:JSON.stringify({q,limit,offset:(page-1)*limit,filter:filters.length?filters.join(" AND "):undefined,sort:["publishedAt:desc"]})});
+   if(result){
+     items=Array.isArray(result.hits)?result.hits.map(x=>({_id:x._id,title:x.title,excerpt:x.excerpt,content:x.content,category:x.category,location:x.location,publishedAt:x.publishedAt,slug:x.slug})):[];total=Number(result.estimatedTotalHits??result.totalHits??items.length);
+   }
+ }
+ if(!Array.isArray(items)){
+   const f={status:"published"};if(category&&category!=="होम")f.category=category;if(location)f.location=location;if(q)f.$text={$search:q};
+   [items,total]=await Promise.all([News.find(f).sort({featured:-1,publishedAt:-1,createdAt:-1}).skip((page-1)*limit).limit(limit).lean(),News.countDocuments(f)]);
+ }
+ const payload={news:items,data:items,pagination:{page,limit,total,pages:Math.ceil(total/limit)}};await redisSetJson(cacheKey,payload,15);
+ res.set("X-Awaaz-Cache",REDIS_ENABLED?"MISS":"DISABLED");res.set("Cache-Control","public, max-age=10, stale-while-revalidate=300, stale-if-error=86400");res.set("CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");res.set("Vercel-CDN-Cache-Control","public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400");res.set("Vercel-Cache-Tag","news");res.json(payload);
  }catch(e){next(e);}});
 app.get("/api/news/:id/preview",async(req,res,next)=>{try{const key=boundedText(req.params.id,180);const item=mongoose.isValidObjectId(key)?await News.findOne({_id:key,status:"published"}).lean():await News.findOne({$or:[{slug:key},{shareCode:key}],status:"published"}).lean();if(!item)return res.status(404).json({message:"News not found"});res.set("Cache-Control","public, max-age=60, s-maxage=300, stale-while-revalidate=900");res.json({news:item,data:item});}catch(e){next(e);}});
 app.get("/api/news/:id",async(req,res,next)=>{try{const key=boundedText(req.params.id,180);const query=mongoose.isValidObjectId(key)?{_id:key,status:"published"}:{ $or:[{slug:key},{shareCode:key}],status:"published"};const item=await News.findOneAndUpdate(query,{$inc:{views:1}},{new:true}).lean();if(!item)return res.status(404).json({message:"News not found"});res.json({news:item,data:item});}catch(e){next(e);}});
@@ -387,6 +411,12 @@ async function deliverPushToActiveSubscribers({title,body,url="/",tagPrefix="awa
 app.post("/api/notifications/subscribe",subscriptionLimiter,async(req,res,next)=>{try{const body=req.body||{},endpoint=String(body.endpoint||"").trim();if(!endpoint||endpoint.length>2048||!isHttpsUrl(endpoint))return res.status(400).json({message:"Invalid subscription endpoint"});if(!body.keys||typeof body.keys!=="object"||Array.isArray(body.keys))return res.status(400).json({message:"Push subscription keys are required"});const p256dh=String(body.keys.p256dh||"").trim(),authKey=String(body.keys.auth||"").trim();if(!p256dh||p256dh.length>512||!authKey||authKey.length>512)return res.status(400).json({message:"Invalid push subscription keys"});if(body.expirationTime!==undefined&&body.expirationTime!==null&&(!Number.isFinite(Number(body.expirationTime))||Number(body.expirationTime)<0))return res.status(400).json({message:"Invalid subscription expiration"});const district=boundedText(body?.district,80),category=boundedText(body?.category,80);await Subscriber.findOneAndUpdate({endpoint},{subscription:{...body,endpoint,keys:{p256dh,auth:authKey},district,category},district,category,active:true},{upsert:true,new:true,setDefaultsOnInsert:true});res.status(201).json({ok:true});}catch(e){next(e);}});
 const adminLoginIpLimiter=rateLimit({windowMs:10*60*1000,limit:120,standardHeaders:"draft-8",legacyHeaders:false,skipSuccessfulRequests:true});
 const adminLoginEmailLimiter=rateLimit({windowMs:10*60*1000,limit:60,standardHeaders:"draft-8",legacyHeaders:false,skipSuccessfulRequests:true,keyGenerator:req=>String(req.body?.email||"").toLowerCase().trim()||req.ip||"login"});
+app.post("/api/admin/search/reindex",auth,ownerOnly,async(_req,res,next)=>{try{
+    if(!MEILI_ENABLED)return res.status(503).json({message:"Meilisearch is not configured"});
+    const rows=await News.find({status:"published"}).select("_id title excerpt content category location publishedAt createdAt slug").lean();
+    let queued=0;for(let i=0;i<rows.length;i+=500){if(await meiliIndexDocuments(rows.slice(i,i+500)))queued++;}
+    res.json({ok:true,index:MEILI_INDEX,documents:rows.length,batches:queued});
+  }catch(e){next(e);}});
 app.post("/api/admin/login",adminLoginIpLimiter,adminLoginEmailLimiter,async(req,res,next)=>{
  try{
   const email=String(req.body?.email||"").toLowerCase().trim(),password=String(req.body?.password||"");
