@@ -11,40 +11,53 @@ function fillAssignmentSelects(selectedCategories=[],selectedDistricts=[]){
 function selectedAssignmentValues(id){return [...($(id)?.selectedOptions||[])].map(o=>o.value);}
 let me=null,news=[],ads=[],admins=[];
 let newsExistingImages=[];
-function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?`${location.protocol}//${location.hostname}:5000`:"";}
+function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?location.protocol+"//"+location.hostname+":5000":"";}
+function getDirectApiBase(){return "https://awaazrajasthan.onrender.com";}
 function setApiBase(){return getApiBase();}
-function getAdminToken(){try{return sessionStorage.getItem("awaaz_admin_session")||""}catch{return""}}
-function setAdminToken(token){try{if(token)sessionStorage.setItem("awaaz_admin_session",String(token));else sessionStorage.removeItem("awaaz_admin_session")}catch{}}
+function getApiCandidates(){const list=[getApiBase()];if(location.hostname&&!/^(localhost|127\.0\.0\.1)$/i.test(location.hostname))list.push(getDirectApiBase());return [...new Set(list)];}
+function getAdminToken(){try{return sessionStorage.getItem("awaaz_admin_session")||localStorage.getItem("awaaz_admin_session")||""}catch{return""}}
+function setAdminToken(token,remember=false){try{if(token){sessionStorage.setItem("awaaz_admin_session",String(token));if(remember)localStorage.setItem("awaaz_admin_session",String(token));}else{sessionStorage.removeItem("awaaz_admin_session");localStorage.removeItem("awaaz_admin_session");}}catch{}}
 function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");sessionStorage.removeItem("awaaz_admin_session");}catch{}try{localStorage.removeItem("awaaz_admin_token");localStorage.removeItem("awaaz_admin_session");}catch{}}
 function initApiBase(){}
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function api(path,options={},attempt=0){
- const base=getApiBase();
  const opts={credentials:"include",cache:"no-store",...options};
  opts.headers={"Content-Type":"application/json",...(options.headers||{})};
  const sessionToken=getAdminToken();
  if(sessionToken&&!opts.headers.Authorization)opts.headers.Authorization="Bearer "+sessionToken;
- const controller=new AbortController();
- const timeout=setTimeout(()=>controller.abort(),20000);
- if(!opts.signal)opts.signal=controller.signal;
- try{
-  const r=await fetch(base+path,opts);
-  let d={};try{d=await r.json()}catch{}
-  if(!r.ok){
-   if((r.status===502||r.status===503||r.status===504)&&attempt<2){await sleep(500*(attempt+1));return api(path,options,attempt+1);}
+ const candidates=getApiCandidates();let lastError=null;
+ for(const base of candidates){
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),25000);
+  try{
+   const r=await fetch(base+path,{...opts,signal:opts.signal||controller.signal});let d={};try{d=await r.json()}catch{}
+   if(r.ok)return d;
    if(r.status===401){const err=new Error(d.message||"Session expired. कृपया फिर login करें।");err.status=401;clearLegacyAdminToken();throw err;}
    if(r.status===429){const err=new Error(d.message||"बहुत अधिक प्रयास हुए हैं। कुछ समय बाद फिर कोशिश करें।");err.status=429;throw err;}
-   if(r.status===502||r.status===503||r.status===504){const err=new Error(d.message||"Server अभी उपलब्ध नहीं है। कुछ सेकंड बाद फिर प्रयास करें।");err.status=r.status;throw err;}
-   throw new Error(d.message||`Server request failed (${r.status}). कृपया कुछ सेकंड बाद फिर प्रयास करें।`);
-  }
-  return d;
- }catch(error){
-  if(error?.name==="AbortError")throw new Error("Server response आने में ज्यादा समय लग रहा है। Internet/Server connection check करें।");
-  if(error instanceof TypeError)throw new Error("Server से connection नहीं हो पाया। Internet connection check करें।");
-  throw error;
- }finally{clearTimeout(timeout);}
+   if([502,503,504].includes(r.status)){lastError=new Error(d.message||"Server अभी जाग रहा है। कुछ सेकंड बाद फिर कोशिश करें।");lastError.status=r.status;continue;}
+   throw new Error(d.message||("Server request failed ("+r.status+")."));
+  }catch(error){if(error?.status===401||error?.status===429)throw error;lastError=error;}finally{clearTimeout(timeout);}
+ }
+ if(attempt<2){await sleep(800*(attempt+1));return api(path,options,attempt+1);}
+ if(lastError?.name==="AbortError")throw new Error("Server response आने में ज्यादा समय लग रहा है। कृपया कुछ सेकंड बाद फिर कोशिश करें।");
+ if(lastError instanceof TypeError)throw new Error("Server से connection नहीं हो पाया। कृपया फिर कोशिश करें।");
+ throw lastError||new Error("Server request failed. कृपया फिर कोशिश करें।");
 }
-async function uploadMedia(file){if(!file)return "";if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");const base=getApiBase();const form=new FormData();form.append("file",file);const headers={};const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});let d={};try{d=await r.json()}catch{}if(!r.ok)throw new Error(d.message||"Image upload failed");return new URL(d.url,base||window.location.origin).href;}
+async function uploadMedia(file){
+ if(!file)return "";
+ if(!/^(image\/(jpeg|png|webp|gif)|video\/(mp4|webm|ogg))$/.test(file.type))throw new Error("केवल JPG, PNG, WEBP, GIF, MP4, WEBM या OGG media स्वीकार है।");
+ const form=new FormData();form.append("file",file);let lastError=null;
+ for(const base of getApiCandidates()){
+  try{
+   const headers={};const token=getAdminToken();if(token)headers.Authorization="Bearer "+token;
+   const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});
+   let d={};try{d=await r.json()}catch{}
+   if(r.ok)return new URL(d.url,base||window.location.origin).href;
+   if(r.status===401){const err=new Error(d.message||"Session expired. फिर login करें।");err.status=401;throw err;}
+   lastError=new Error(d.message||"Media upload failed");
+  }catch(e){if(e?.status===401)throw e;lastError=e;}
+ }
+ throw lastError||new Error("Media upload failed");
+}
 function esc(v){return String(v??"").replace(/[&<>"']/g,s=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[s]));}
 function toast(msg){const e=document.createElement("div");e.className="toast";e.textContent=msg;document.body.appendChild(e);setTimeout(()=>e.remove(),2200);}
 function formatDate(value){if(!value)return "अभी तक कोई subscription नहीं";try{return new Date(value).toLocaleString("hi-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});}catch{return "अभी तक कोई subscription नहीं";}}
@@ -98,7 +111,7 @@ const handleLogin=async e=>{
  btn.disabled=true;btn.dataset.oldText=btn.textContent;btn.textContent="Login हो रहा है…";
  try{
   const loginResponse=await api("/api/admin/login",{method:"POST",body:JSON.stringify({email,password})});
-  if(loginResponse?.token)setAdminToken(loginResponse.token);
+  if(loginResponse?.token)setAdminToken(loginResponse.token,$("rememberLogin")?.checked===true);
   const session=await api("/api/admin/me");
   if(!session?.admin)throw new Error("Secure admin session verify नहीं हो पाई। कृपया फिर से Login करें।");
   me=session.admin;

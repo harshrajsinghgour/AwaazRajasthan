@@ -1,3 +1,6 @@
+export const revalidate = 10;
+export const dynamicParams = true;
+
 import ClientApp from "../ClientApp";
 
 const BACKEND = String(process.env.BACKEND_INTERNAL_URL || process.env.NEXT_PUBLIC_API_URL || "https://awaazrajasthan.onrender.com").replace(/\/$/, "");
@@ -25,7 +28,7 @@ function sanitizeNewsMedia(item) {
 
 async function getHomeNews() {
   try {
-    const response = await fetch(`${BACKEND}/api/news?limit=30`, {
+    const response = await fetch(`${SITE}/api/news?limit=30`, {
       next: { revalidate: 10, tags: ["news"] }
     });
     if (!response.ok) return [];
