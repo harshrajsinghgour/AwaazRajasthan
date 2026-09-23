@@ -626,7 +626,7 @@ app.post("/api/admin/upload",auth,permissions("media:write"),upload.single("file
   if(!req.file)return res.status(400).json({message:"File required"});
   const folder=req.file.mimetype==="application/pdf"?"epapers":req.file.mimetype.startsWith("video/")?"videos":"images";
   const stored=await storeUploadedFile(req.file,folder);
-  res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,filename:req.file.filename,mimetype:req.file.mimetype,size:req.file.size,storage:stored.storage});
+  res.status(201).json({url:stored.url,relativeUrl:stored.relativeUrl,variants:stored.variants||null,optimized:Boolean(stored.optimized),filename:req.file.filename,mimetype:req.file.mimetype,size:req.file.size,storage:stored.storage});
  }catch(e){next(e)}
 });
 app.get("/api/admin/ads/analytics",auth,ownerOnly,async(_r,res,next)=>{try{const ads=await Ad.find({}).select("title position device status startDate endDate impressions clicks createdAt").sort({createdAt:-1}).lean();res.json({analytics:ads.map(a=>({...a,ctr:a.impressions?Number(((a.clicks/a.impressions)*100).toFixed(2)):0}))});}catch(e){next(e);}});
