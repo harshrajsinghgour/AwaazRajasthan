@@ -338,32 +338,34 @@ export default function AppProduction() {
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
-    setLoading(true);
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+    const isHome = category === "होम" && !district && !query.trim();
+    const cached = isHome ? readStorageJson("awaaz-news-cache", []) : [];
+    if (isHome && cached.length && !news.length) setNews(cached.map(normalize));
+    setLoading(!news.length);
+
     const timer = setTimeout(() => {
-      const params = new URLSearchParams({ limit: query.trim() ? "100" : "20", _t: String(Date.now()) });
+      const params = new URLSearchParams({ limit: query.trim() ? "100" : "20" });
       if (category !== "होम") params.set("category", category);
       if (district) params.set("location", district);
       if (query.trim()) params.set("q", query.trim());
       const path = `/api/news?${params.toString()}`;
       const load = async () => {
-        const targets = [`${API_BASE}${path}`];
         let lastError = null;
-        for (const target of targets) {
-          for (let attempt = 0; attempt < 2; attempt += 1) {
-            if (controller.signal.aborted) throw new DOMException("Request aborted", "AbortError");
-            try {
-              const response = await fetch(target, { headers: { Accept: "application/json", "Cache-Control": "no-cache" }, cache: "no-store", signal: controller.signal });
-              if (!response.ok) throw new Error(`News API HTTP ${response.status}`);
-              const data = await response.json();
-              const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
-              if (!Array.isArray(list)) throw new Error("News API response invalid");
-              return data;
-            } catch (error) {
-              lastError = error;
-              if (controller.signal.aborted) throw lastError;
-              if (attempt === 0) await new Promise(resolve => window.setTimeout(resolve, 250));
-            }
+        const target = `${API_BASE}${path}`;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          if (controller.signal.aborted) throw new DOMException("Request aborted", "AbortError");
+          try {
+            const response = await fetch(target, { headers: { Accept: "application/json" }, cache: "default", signal: controller.signal });
+            if (!response.ok) throw new Error(`News API HTTP ${response.status}`);
+            const data = await response.json();
+            const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
+            if (!Array.isArray(list)) throw new Error("News API response invalid");
+            return data;
+          } catch (error) {
+            lastError = error;
+            if (controller.signal.aborted) throw lastError;
+            if (attempt < 3) await new Promise(resolve => window.setTimeout(resolve, [400, 1000, 2200][attempt]));
           }
         }
         throw lastError || new Error("News API unavailable");
@@ -371,7 +373,13 @@ export default function AppProduction() {
       load()
         .then(data => {
           const list = Array.isArray(data) ? data : (data.news || data.data || data.articles || []);
-          if (!cancelled && Array.isArray(list)) { const normalized=list.map(normalize); if (normalized.length) { setNews(normalized); if (category === "होम" && !district && !query.trim()) writeStorage("awaaz-news-cache", JSON.stringify(normalized.slice(0,20))); } }
+          if (!cancelled && Array.isArray(list)) {
+            const normalized = list.map(normalize);
+            if (normalized.length) {
+              setNews(normalized);
+              if (isHome) writeStorage("awaaz-news-cache", JSON.stringify(normalized.slice(0, 20)));
+            }
+          }
         })
         .catch(error => {
           if (!cancelled && error?.name !== "AbortError") console.warn("NEWS_FEED_LOAD_FAILED", error);
