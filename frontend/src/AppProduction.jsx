@@ -266,9 +266,12 @@ function EpaperPage() {
   </div>;
 }
 
-export default function AppProduction() {
+export default function AppProduction({ initialNews = [] }) {
   if(typeof window!=="undefined" && window.location.pathname==="/epaper") return <EpaperPage />;
-  const [news, setNews] = useState(() => readStorageJson("awaaz-news-cache", [])), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
+  const [news, setNews] = useState(() => {
+    if (Array.isArray(initialNews) && initialNews.length) return initialNews.map(normalize);
+    return readStorageJson("awaaz-news-cache", []);
+  }), [loading, setLoading] = useState(false), [category, setCategory] = useState("होम"), [feedType, setFeedType] = useState("latest"), [homeButtons, setHomeButtons] = useState(DEFAULT_HOME_BUTTONS), [district, setDistrict] = useState(""), [query, setQuery] = useState(""), [searchOpen, setSearchOpen] = useState(false), [menuOpen, setMenuOpen] = useState(false), [newsRefreshKey, setNewsRefreshKey] = useState(0);
   const [saved, setSaved] = useState(() => {
     try {
       const bookmarks = readStorageJson("awaaz-bookmarks", []).map(x => String(x)).filter(Boolean);
