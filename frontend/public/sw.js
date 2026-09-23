@@ -1,4 +1,5 @@
-const CACHE = "awaaz-rajasthan-v17";
+const CACHE = "awaaz-rajasthan-v18";
+const NEWS_CACHE = "awaaz-rajasthan-news-v1";
 const APP_SHELL = ["/", "/index.html", "/news-placeholder.svg", "/awaazrajasthan-logo.png", "/manifest.webmanifest"];
 
 function safeNotificationUrl(value) {
@@ -29,7 +30,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((key) => key.startsWith("awaaz-rajasthan-") && key !== CACHE).map((key) => caches.delete(key))
+        keys.filter((key) => key.startsWith("awaaz-rajasthan-") && key !== CACHE && key !== NEWS_CACHE).map((key) => caches.delete(key))
       ))
       .then(() => self.clients.claim())
   );
@@ -39,7 +40,26 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  if (url.pathname === "/admin" || url.pathname.startsWith("/admin/") || url.pathname.startsWith("/api/")) return;
+  if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) return;
+
+  if (url.pathname === "/api/news" || url.pathname.startsWith("/api/news/")) {
+    event.respondWith(
+      caches.open(NEWS_CACHE).then(async (cache) => {
+        try {
+          const response = await fetch(event.request);
+          if (response && response.ok) await cache.put(event.request, response.clone());
+          return response;
+        } catch {
+          const cached = await cache.match(event.request);
+          return cached || new Response(JSON.stringify({ news: [], pagination: { total: 0 } }), {
+            status: 200,
+            headers: { "Content-Type": "application/json", "X-Awaaz-Offline": "1" }
+          });
+        }
+      })
+    );
+    return;
+  }
 
   const isStatic =
     url.pathname.startsWith("/assets/") ||
@@ -72,18 +92,18 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      caches.match("/index.html").then((cached) => {
-        const network = fetch(event.request)
-          .then((response) => {
-            if (response && response.ok) {
-              const copy = response.clone();
-              caches.open(CACHE).then((cache) => cache.put("/index.html", copy)).catch(() => {});
-            }
-            return response;
-          })
-          .catch(() => cached || new Response("Offline", { status: 503, statusText: "Offline" }));
-        return cached || network;
-      })
+      fetch(event.request)
+        .then(async (response) => {
+          if (response && response.ok) {
+            const cache = await caches.open(CACHE);
+            await cache.put(event.request, response.clone()).catch(() => {});
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request) || await caches.match("/");
+          return cached || new Response("Offline", { status: 503, statusText: "Offline" });
+        })
     );
   }
 });
