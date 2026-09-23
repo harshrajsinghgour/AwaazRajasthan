@@ -25,9 +25,14 @@ async function api(path,options={},attempt=0){
  opts.headers={"Content-Type":"application/json",...(options.headers||{})};
  const sessionToken=getAdminToken();
  if(sessionToken&&!opts.headers.Authorization)opts.headers.Authorization="Bearer "+sessionToken;
- const candidates=getApiCandidates();let lastError=null;
+ const candidates=getApiCandidates();
+ const startedAt=Date.now();
+ let lastError=null;
  for(const base of candidates){
-  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),25000);
+  const remaining=15000-(Date.now()-startedAt);
+  if(remaining<=0)break;
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),Math.min(8000,Math.max(1000,remaining)));
   try{
    const r=await fetch(base+path,{...opts,signal:opts.signal||controller.signal});let d={};try{d=await r.json()}catch{}
    if(r.ok)return d;
@@ -37,8 +42,8 @@ async function api(path,options={},attempt=0){
    throw new Error(d.message||("Server request failed ("+r.status+")."));
   }catch(error){if(error?.status===401||error?.status===429)throw error;lastError=error;}finally{clearTimeout(timeout);}
  }
- if(attempt<2){await sleep(800*(attempt+1));return api(path,options,attempt+1);}
- if(lastError?.name==="AbortError")throw new Error("Server response आने में ज्यादा समय लग रहा है। कृपया कुछ सेकंड बाद फिर कोशिश करें।");
+ if(Date.now()-startedAt<15000 && attempt<1){await sleep(500);return api(path,options,attempt+1);}
+ if(lastError?.name==="AbortError")throw new Error("Server को response देने में समय लग रहा है। कृपया 10–15 सेकंड बाद फिर कोशिश करें।");
  if(lastError instanceof TypeError)throw new Error("Server से connection नहीं हो पाया। कृपया फिर कोशिश करें।");
  throw lastError||new Error("Server request failed. कृपया फिर कोशिश करें।");
 }
@@ -66,8 +71,17 @@ function nullableDate(id){const value=$(id)?.value||"";return value?new Date(val
 function updateNewsPlacement(){const c=$("newsCategory")?.value||"",l=$("newsLocation")?.value||"";const box=$("newsPlacementPreview");if(!box)return;if(!c||!l){box.innerHTML="<b>Placement</b><span>पहले श्रेणी और जिला चुनें।</span>";return;}box.innerHTML="<b>यह खबर जाएगी:</b><span>"+esc(c)+" section · "+esc(l)+" जिला</span><small>वेबसाइट के category और district filters इसी saved data पर काम करेंगे।</small>";box.classList.remove("hidden");}
 function previewNewsImages(){const box=$("newsImageSelectionPreview");if(!box)return;let existing=[];try{existing=JSON.parse($("newsExistingImages")?.value||"[]")}catch{}if(!Array.isArray(existing))existing=[];const files=Array.from($("newsImageFile")?.files||[]);const urls=files.map(file=>URL.createObjectURL(file));const all=[...existing,...urls].filter(Boolean);if(!all.length){box.classList.add("hidden");box.innerHTML="";return;}box.innerHTML="<div class=\"multi-photo-count\">📷 "+all.length+" Photos चयनित / saved</div><div class=\"multi-photo-grid\">"+all.slice(0,20).map((src,i)=>`<div class=\"multi-photo-item\"><img src=\"${esc(src)}\" alt=\"Photo ${i+1}\"><span>${i+1}</span></div>`).join("")+"</div>";box.classList.remove("hidden");}
 function previewMedia(inputId,urlId,boxId){const box=$(boxId);if(!box)return;const file=$(inputId)?.files?.[0],url=$(urlId)?.value?.trim()||"";if(!file&&!url){box.classList.add("hidden");box.innerHTML="";return;}const src=file?URL.createObjectURL(file):url;const isVideo=file?String(file.type||"").startsWith("video/"):/\.(mp4|webm|ogg)(\?|#|$)/i.test(url);box.innerHTML=isVideo?`<video src="${esc(src)}" controls muted playsinline></video>`:`<img src="${esc(src)}" alt="Media preview">`;box.classList.remove("hidden");}
+async function warmAdminBackend(){
+ try{
+  const controller=new AbortController();
+  const t=setTimeout(()=>controller.abort(),7000);
+  await fetch("/api/health",{headers:{Accept:"application/json"},cache:"no-store",credentials:"include",signal:controller.signal});
+  clearTimeout(t);
+ }catch{}
+}
 async function boot(){
  initApiBase();
+ void warmAdminBackend();
  try{
   const session=await api("/api/admin/me");
   if(!session?.admin)throw new Error("No active admin session");
