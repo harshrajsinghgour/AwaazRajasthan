@@ -19,6 +19,7 @@ import nodemailer from "nodemailer";
 import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PDFDocument, rgb } from "pdf-lib";
+import sharp from "sharp";
 import Razorpay from "razorpay";
 
 const app=express();
@@ -258,45 +259,56 @@ async function ensureMeiliIndex(){
 }
 
 const b2ObjectKey=(folder,file)=>`${folder}/${crypto.randomUUID()}-${path.basename(file.filename)}`;
+async function putB2WithRetry(key,body,contentType){
+ let lastError=null;
+ for(let attempt=1;attempt<=5;attempt+=1){
+  try{
+   await b2.send(new PutObjectCommand({Bucket:B2_BUCKET_NAME,Key:key,Body:body,ContentType:contentType,CacheControl:"public, max-age=31536000, immutable"}));
+   return;
+  }catch(error){
+   lastError=error;
+   const code=String(error?.name||error?.Code||"");
+   console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
+   if(attempt<5)await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt-1)));
+  }
+ }
+ throw lastError||new Error("B2 upload failed");
+}
+function mediaRelative(key){return "/api/media/"+key.split("/").map(encodeURIComponent).join("/");}
 async function storeUploadedFile(file,folder){
  if(!file) throw new Error("File required");
- if(!B2_ENABLED) throw new Error("B2 durable storage is not configured");
- const key=b2ObjectKey(folder,file);
+ if(!B2_ENABLED) throw new Error("B2 durable media storage is not configured");
  try{
-  // Read the temporary multipart file once so a retry can safely resend the body.
-  // Streaming a consumed file can turn transient B2/network timeouts into non-retryable failures.
   const body=await fs.promises.readFile(file.path);
-  let lastError=null;
-  for(let attempt=1;attempt<=5;attempt+=1){
-   try{
-    await b2.send(new PutObjectCommand({
-     Bucket:B2_BUCKET_NAME,
-     Key:key,
-     Body:body,
-     ContentType:file.mimetype,
-     CacheControl:"public, max-age=31536000, immutable"
-    }));
-    lastError=null;
-    break;
-   }catch(error){
-    lastError=error;
-    const code=String(error?.name||error?.Code||"");
-    console.error("B2 upload attempt "+attempt+" failed:",code||error?.message||error);
-    if(attempt<5) await new Promise(resolve=>setTimeout(resolve,1000*Math.pow(2,attempt-1)));
+  const isOptimizableImage=/^image\\/(jpeg|png|webp)$/i.test(String(file.mimetype||""));
+  const variants={};
+  if(isOptimizableImage){
+   const image=sharp(body,{failOn:"none"});
+   for(const width of [480,960,1440]){
+    const key=`${folder}/optimized/${crypto.randomUUID()}-w${width}.webp`;
+    const out=await image.clone().resize({width,withoutEnlargement:true}).webp({quality:78}).toBuffer();
+    await putB2WithRetry(key,out,"image/webp");
+    variants[`w${width}`]=mediaRelative(key);
    }
+   try{
+    const key=`${folder}/optimized/${crypto.randomUUID()}-w1440.avif`;
+    const out=await image.clone().resize({width:1440,withoutEnlargement:true}).avif({quality:55}).toBuffer();
+    await putB2WithRetry(key,out,"image/avif");
+    variants.avif=mediaRelative(key);
+   }catch(error){console.warn("AVIF optimization skipped:",error?.message||error);}
+   const primaryKey=Object.keys(variants).includes("w1440")?variants.w1440:variants.w960;
+   return {key:primaryKey,url:primaryKey,publicUrl:PUBLIC_API_URL+primaryKey,relativeUrl:primaryKey,variants,storage:"b2",optimized:true};
   }
-  if(lastError) throw lastError;
+  const key=b2ObjectKey(folder,file);
+  await putB2WithRetry(key,body,file.mimetype);
+  const relative=mediaRelative(key);
+  return {key,url:relative,publicUrl:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2",optimized:false};
  }catch(error){
   console.error("B2 upload failed:",error?.name||error?.Code||error?.message||error);
   throw new Error("Media could not be stored in Backblaze B2. Please retry the upload.");
  }finally{
   try{await fs.promises.unlink(file.path)}catch{}
  }
- const relative="/api/media/"+key.split("/").map(encodeURIComponent).join("/");
- // Public clients should use the same-origin Vercel proxy. Keep the Render
- // API hostname out of persisted media URLs while retaining the absolute
- // base internally for compatibility/debugging.
- return {key,url:relative,publicUrl:PUBLIC_API_URL+relative,relativeUrl:relative,storage:"b2"};
 }
 async function getB2SignedUrl(key){
  if(!B2_ENABLED) return null;
