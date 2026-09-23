@@ -280,7 +280,7 @@ async function storeUploadedFile(file,folder){
  if(!B2_ENABLED) throw new Error("B2 durable media storage is not configured");
  try{
   const body=await fs.promises.readFile(file.path);
-  const isOptimizableImage=/^image\\/(jpeg|png|webp)$/i.test(String(file.mimetype||""));
+  const isOptimizableImage=/^image\/(jpeg|png|webp)$/i.test(String(file.mimetype||""));
   const variants={};
   if(isOptimizableImage){
    const image=sharp(body,{failOn:"none"});
