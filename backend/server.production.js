@@ -198,7 +198,7 @@ const normalizeDate=v=>{if(v===undefined||v===null||v==="")return null;const d=n
 const validateAdDates=(start,end)=>{const s=normalizeDate(start),e=normalizeDate(end);if((start!==undefined&&start!==null&&start!==""&&!s)||(end!==undefined&&end!==null&&end!==""&&!e))return {error:"Invalid ad schedule date"};if(s&&e&&s>e)return {error:"Ad start date must be before or equal to end date"};return {start:s,end:e};};
 const boundedText=(value,max)=>String(value??"").trim().slice(0,max);
 const publicCache=(res,seconds=15,stale=60)=>res.set("Cache-Control",`public, max-age=${seconds}, stale-while-revalidate=${stale}`);
-const REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\\/$/,"");
+const REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\/$/,"");
 const REDIS_TOKEN=String(process.env.UPSTASH_REDIS_REST_TOKEN||"").trim();
 const REDIS_ENABLED=Boolean(REDIS_URL&&REDIS_TOKEN);
 async function redisCommand(command){
