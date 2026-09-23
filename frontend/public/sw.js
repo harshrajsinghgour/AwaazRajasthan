@@ -62,6 +62,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   const isStatic =
+    url.pathname.startsWith("/_next/static/") ||
     url.pathname.startsWith("/assets/") ||
     url.pathname.endsWith(".css") ||
     url.pathname.endsWith(".js") ||
