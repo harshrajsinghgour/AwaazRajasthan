@@ -2,6 +2,6 @@
 
 import App from "../src/AppProduction";
 
-export default function ClientApp() {
-  return <App />;
+export default function ClientApp({ initialNews = [] }) {
+  return <App initialNews={initialNews} />;
 }
