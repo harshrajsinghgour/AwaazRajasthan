@@ -16,6 +16,14 @@
       "destination": "https://awaazrajasthan.onrender.com/api/sitemap.xml"
     },
     {
+      "source": "/sitemap-news.xml",
+      "destination": "https://awaazrajasthan.onrender.com/api/sitemap-news.xml"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "https://awaazrajasthan.onrender.com/api/rss.xml"
+    },
+    {
       "source": "/news/:path*",
       "destination": "/api/share?slug=:path*"
     },
