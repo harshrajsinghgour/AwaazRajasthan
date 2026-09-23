@@ -86,7 +86,7 @@ function icon(name) {
 function Brand() { return <div className="brand" aria-label="आवाज़ राजस्थान"><img className="brand-logo-image" src="/awaazrajasthan-logo.png" alt="आवाज़ राजस्थान" /><div><strong>आवाज़ राजस्थान</strong><small>राजस्थान की अपनी खबर</small></div></div>; }
 function safeAdUrl(value) { if (typeof value !== "string" || !value.trim()) return "#"; try { const url = new URL(value, window.location.origin); if (url.protocol !== "http:" && url.protocol !== "https:") return "#"; return url.href; } catch { return "#"; } }function AdSlot({ position = "home_top", className = "" }) {
   const [ad, setAd] = useState(null); const counted = useRef(false);
-useEffect(() => { let cancelled = false; fetch(`${API_BASE}/api/ads?position=${encodeURIComponent(position)}&device=${window.innerWidth < 768 ? "mobile" : "desktop"}`, { headers: { Accept: "application/json" } }).then(r => r.ok ? r.json() : Promise.reject()).then(data => { const list = Array.isArray(data) ? data : (data.ads || data.data || []); if (!cancelled && list[0]) setAd(list[0]); }).catch(() => {}); return () => { cancelled = true; }; }, [position]);
+useEffect(() => { let cancelled = false; const timer = window.setTimeout(() => fetch(`${API_BASE}/api/ads?position=${encodeURIComponent(position)}&device=${window.innerWidth < 768 ? "mobile" : "desktop"}`, { headers: { Accept: "application/json" } }).then(r => r.ok ? r.json() : Promise.reject()).then(data => { const list = Array.isArray(data) ? data : (data.ads || data.data || []); if (!cancelled && list[0]) setAd(list[0]); }).catch(() => {}), 1200); return () => { cancelled = true; window.clearTimeout(timer); }; }, [position]);
   useEffect(() => { const id = ad?._id || ad?.id; if (!id || counted.current) return; counted.current = true; fetch(`${API_BASE}/api/ads/${id}/impression`, { method: "POST" }).catch(() => {}); }, [ad]);
   if (!ad) return <div className={`ad-slot ${className}`}><span>विज्ञापन</span></div>;
   const image = mediaUrl(ad.image || ad.imageUrl || ad.banner); const video = mediaUrl(ad.video || ad.videoUrl || ""); const href = safeAdUrl(ad.link);
@@ -280,6 +280,14 @@ export default function AppProduction({ initialNews = [] }) {
     } catch { return []; }
   }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
   const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null), [appInstalled, setAppInstalled] = useState(() => typeof window!=="undefined" && (window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true));
+  // First 15-second critical window: warm the API without blocking the first paint.
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 7000);
+    fetch("/api/health", { headers: { Accept: "application/json" }, cache: "no-store", signal: controller.signal }).catch(() => {}).finally(() => window.clearTimeout(timer));
+    return () => { controller.abort(); window.clearTimeout(timer); };
+  }, []);
+
   useEffect(() => {
     const section = new URLSearchParams(window.location.search).get("section");
     if (!section) return;
@@ -340,11 +348,14 @@ export default function AppProduction({ initialNews = [] }) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !("EventSource" in window)) return;
+    const timer = window.setTimeout(() => {
     const source = new EventSource(`${API_BASE}/api/news/stream`);
     const refresh = () => setNewsRefreshKey(v => v + 1);
     source.addEventListener("news-updated", refresh);
     source.onerror = () => {};
-    return () => { source.removeEventListener("news-updated", refresh); source.close(); };
+    return () => { source.removeEventListener("news-updated", refresh); source.close(); window.clearTimeout(timer); };
+    }, 15000);
+    return () => window.clearTimeout(timer);
   }, []);
   useEffect(() => { const onScroll = () => setShowTop(window.scrollY > 650); const onInstall = e => { e.preventDefault(); setInstallPrompt(e); }; window.addEventListener("scroll", onScroll, { passive: true }); window.addEventListener("beforeinstallprompt", onInstall); const onInstalled = () => { setAppInstalled(true); setInstallPrompt(null); setToast("आवाज़ राजस्थान ऐप सफलतापूर्वक इंस्टॉल हो गया"); }; window.addEventListener("appinstalled", onInstalled); const media = window.matchMedia?.("(display-mode: standalone)"); const onModeChange = () => setAppInstalled(media?.matches || window.navigator.standalone === true); media?.addEventListener?.("change", onModeChange); return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("beforeinstallprompt", onInstall); window.removeEventListener("appinstalled", onInstalled); media?.removeEventListener?.("change", onModeChange); }; }, []);
   useEffect(() => {
