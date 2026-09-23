@@ -9,8 +9,7 @@
   "scripts": {
     "start": "node server.production.js",
     "dev": "node --watch server.production.js",
-    "push-worker": "node push-worker.js",
-    "scheduled-publisher": "node scheduled-publisher.js"
+    "push-worker": "node push-worker.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1136.0",
