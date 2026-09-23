@@ -49,6 +49,12 @@ services:
         sync: false
       - key: UPSTASH_REDIS_REST_TOKEN
         sync: false
+      - key: MEILI_URL
+        sync: false
+      - key: MEILI_MASTER_KEY
+        sync: false
+      - key: MEILI_INDEX
+        value: awaaz_news
 
   - type: worker
     name: awaaz-rajasthan-push-worker
