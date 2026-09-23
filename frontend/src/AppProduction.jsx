@@ -95,13 +95,16 @@ useEffect(() => { let cancelled = false; const timer = window.setTimeout(() => f
 function NewsImage({ item, className = "" }) {
   const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[];
   const [index,setIndex]=useState(0);
-  const [src,setSrc]=useState("");
+  // Render the actual uploaded image during SSR/first paint so news never
+  // appears as a placeholder while hydration waits for useEffect.
+  const [src,setSrc]=useState(()=>safeImage(images[0]||""));
   useEffect(()=>{setIndex(0);setSrc(safeImage(images[0]||""));},[item?.id]);
   const raw=images[index]||images[0]||"";
   useEffect(()=>{setSrc(safeImage(raw));},[raw]);
   function handleError(){ setSrc("/news-placeholder.svg"); }
+  const isHero=String(className||"").includes("hero");
   return <div className={`news-media-frame ${className}`}>
-    <img className="news-media-image" src={src||"/news-placeholder.svg"} alt={item?.title||"खबर"} loading="lazy" decoding="async" onError={handleError} />
+    <img className="news-media-image" src={src||"/news-placeholder.svg"} alt={item?.title||"खबर"} loading={isHero?"eager":"lazy"} fetchPriority={isHero?"high":"auto"} decoding="async" onError={handleError} />
     {images.length>1 && <div className="news-photo-badge">📷 {index+1}/{images.length}</div>}
     {images.length>1 && <div className="news-photo-dots" aria-label="फोटो बदलें">{images.map((_,i)=><button key={i} type="button" className={i===index?"active":""} aria-label={`फोटो ${i+1}`} onClick={e=>{e.stopPropagation();setIndex(i);}} />)}</div>}
     {item?.video && <span className="news-video-badge">▶ वीडियो</span>}
