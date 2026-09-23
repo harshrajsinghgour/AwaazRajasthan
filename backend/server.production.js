@@ -20,6 +20,7 @@ import { S3Client, PutObjectCommand, GetObjectCommand, HeadBucketCommand, HeadOb
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PDFDocument, rgb } from "pdf-lib";
 import sharp from "sharp";
+import Redis from "ioredis";
 import Razorpay from "razorpay";
 
 const app=express();
@@ -204,13 +205,24 @@ function broadcastNewsEvent(type,payload={}){
   const message=`event: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
   for(const client of sseClients){try{client.res.write(message);}catch{sseClients.delete(client);}}
 }
-const REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\/$/,"");
+const REDIS_URL=String(process.env.REDIS_URL||"").trim();
+const UPSTASH_REDIS_URL=String(process.env.UPSTASH_REDIS_REST_URL||"").trim().replace(/\/$/,"");
 const REDIS_TOKEN=String(process.env.UPSTASH_REDIS_REST_TOKEN||"").trim();
-const REDIS_ENABLED=Boolean(REDIS_URL&&REDIS_TOKEN);
+const REDIS_ENABLED=Boolean(REDIS_URL||(UPSTASH_REDIS_URL&&REDIS_TOKEN));
+const redisClient=REDIS_URL?new Redis(REDIS_URL,{maxRetriesPerRequest:2,enableReadyCheck:true,lazyConnect:false}):null;
 async function redisCommand(command){
-  if(!REDIS_ENABLED)return null;
+  if(redisClient){
+    try{
+      const [op,...args]=command;
+      if(op==="GET")return await redisClient.get(...args);
+      if(op==="SET")return await redisClient.set(...args);
+      if(op==="DEL")return await redisClient.del(...args);
+      if(op==="INCR")return await redisClient.incr(...args);
+    }catch{return null;}
+  }
+  if(!UPSTASH_REDIS_URL||!REDIS_TOKEN)return null;
   try{
-    const r=await fetch(REDIS_URL,{method:"POST",headers:{"Authorization":`Bearer ${REDIS_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify(command)});
+    const r=await fetch(UPSTASH_REDIS_URL,{method:"POST",headers:{"Authorization":`Bearer ${REDIS_TOKEN}`,"Content-Type":"application/json"},body:JSON.stringify(command)});
     if(!r.ok)return null;
     const data=await r.json();
     return data?.result ?? null;
