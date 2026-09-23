@@ -17,7 +17,7 @@
     },
     {
       "source": "/news/:path*",
-      "destination": "/index.html"
+      "destination": "/api/share?slug=:path*"
     },
     {
       "source": "/n/:path*",
@@ -30,6 +30,25 @@
     {
       "source": "/:path*",
       "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/news",
+      "headers": [
+        {
+          "key": "CDN-Cache-Control",
+          "value": "public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "public, s-maxage=30, stale-while-revalidate=3600, stale-if-error=86400"
+        },
+        {
+          "key": "Vercel-Cache-Tag",
+          "value": "news"
+        }
+      ]
     }
   ]
 }
