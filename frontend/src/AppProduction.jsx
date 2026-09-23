@@ -311,15 +311,17 @@ export default function AppProduction({ initialNews = [] }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/home-buttons`, { headers: { Accept: "application/json" } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(data => { const rows = Array.isArray(data?.buttons) ? data.buttons.filter(x => x && x.active !== false) : []; if (!cancelled && rows.length) setHomeButtons(rows); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+    const timer = window.setTimeout(() => {
+      fetch(`${API_BASE}/api/home-buttons`, { headers: { Accept: "application/json" } })
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(data => { const rows = Array.isArray(data?.buttons) ? data.buttons.filter(x => x && x.active !== false) : []; if (!cancelled && rows.length) setHomeButtons(rows); })
+        .catch(() => {});
+    }, 1200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, []);
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
+    const timer = window.setTimeout(() => fetch(`${API_BASE}/api/categories`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => {
         const names = Array.isArray(data?.categories) ? data.categories.filter(Boolean) : [];
@@ -333,18 +335,18 @@ export default function AppProduction({ initialNews = [] }) {
           setCategories(["होम", ...desired, ...rest]);
         }
       })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => {}), 1200);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, []);
   const [vapidPublicKey, setVapidPublicKey] = useState(BUILD_VAPID_PUBLIC_KEY);
   useEffect(() => {
     if (vapidPublicKey) return;
     let cancelled = false;
-    fetch(`${API_BASE}/api/notifications/public-key`, { headers: { Accept: "application/json" } })
+    const timer = window.setTimeout(() => fetch(`${API_BASE}/api/notifications/public-key`, { headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(data => { if (!cancelled && data?.publicKey) setVapidPublicKey(String(data.publicKey).trim()); })
-      .catch(() => {});
-    return () => { cancelled = true; };
+      .catch(() => {}), 1500);
+    return () => { cancelled = true; window.clearTimeout(timer); };
   }, [vapidPublicKey]);
 
   useEffect(() => { document.documentElement.lang = "hi"; document.documentElement.dataset.theme = dark ? "dark" : "light"; writeStorage("awaaz-theme", dark ? "dark" : "light"); }, [dark]);
