@@ -15,7 +15,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY || !VAPID_SUBJECT) throw new Error("
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-const newsSchema = new mongoose.Schema({ title: String, slug: String, excerpt: String, category: String, location: String, image: String, status: String, breaking: Boolean, publishedAt: Date, pushNotifiedAt: Date }, { collection: "news", timestamps: true });
+const newsSchema = new mongoose.Schema({ title: String, slug: String, excerpt: String, category: String, location: String, image: mongoose.Schema.Types.Mixed, status: String, breaking: Boolean, publishedAt: Date, pushNotifiedAt: Date }, { collection: "news", timestamps: true });
 const subscriberSchema = new mongoose.Schema({ endpoint: { type: String, unique: true }, subscription: mongoose.Schema.Types.Mixed, district: { type: String, default: "" }, category: { type: String, default: "" }, active: Boolean, lastSuccessAt: Date, lastFailureAt: Date }, { collection: "subscribers", timestamps: true });
 const deliverySchema = new mongoose.Schema({
   newsId: { type: mongoose.Schema.Types.ObjectId, unique: true },
@@ -138,6 +138,22 @@ async function sendToSubscribers(news, claimToken) {
   return { sent, removed, retry, remaining, noSubscribers: false };
 }
 
+async function processScheduledNews() {
+  const now = new Date();
+  let published = 0;
+  for (let i = 0; i < 100; i++) {
+    const row = await News.findOneAndUpdate(
+      { status: "scheduled", publishedAt: { $lte: now } },
+      { $set: { status: "published", updatedAt: now } },
+      { new: true, sort: { publishedAt: 1, createdAt: 1 } }
+    ).lean();
+    if (!row) break;
+    published++;
+    console.log(`Scheduled news published: ${row._id}`);
+  }
+  return published;
+}
+
 async function processBreakingNews() {
   const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const candidates = await News.find({ status: "published", breaking: true, publishedAt: { $gte: since } }).sort({ publishedAt: 1, createdAt: 1 }).limit(25).lean();
@@ -170,7 +186,7 @@ async function main() {
   await mongoose.connect(MONGODB_URI);
   console.log(`Awaaz Rajasthan push worker started; polling every ${POLL_MS}ms; concurrency=${PUSH_CONCURRENCY}`);
   let running = false;
-  const tick = async () => { if (running) return; running = true; try { await processBreakingNews(); } catch (error) { console.error("Push worker cycle failed:", error); } finally { running = false; } };
+  const tick = async () => { if (running) return; running = true; try { await processScheduledNews(); await processBreakingNews(); } catch (error) { console.error("Push worker cycle failed:", error); } finally { running = false; } };
   await tick();
   setInterval(tick, POLL_MS);
 }
