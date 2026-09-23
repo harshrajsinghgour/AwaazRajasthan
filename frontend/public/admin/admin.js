@@ -12,9 +12,8 @@ function selectedAssignmentValues(id){return [...($(id)?.selectedOptions||[])].m
 let me=null,news=[],ads=[],admins=[];
 let newsExistingImages=[];
 function getApiBase(){return /^(localhost|127\.0\.0\.1)$/i.test(location.hostname)?location.protocol+"//"+location.hostname+":5000":"";}
-function getDirectApiBase(){return "https://awaazrajasthan.onrender.com";}
 function setApiBase(){return getApiBase();}
-function getApiCandidates(){const list=[getApiBase()];if(location.hostname&&!/^(localhost|127\.0\.0\.1)$/i.test(location.hostname))list.push(getDirectApiBase());return [...new Set(list)];}
+function getApiCandidates(){return [getApiBase()];}
 function getAdminToken(){try{return sessionStorage.getItem("awaaz_admin_session")||localStorage.getItem("awaaz_admin_session")||""}catch{return""}}
 function setAdminToken(token,remember=false){try{if(token){sessionStorage.setItem("awaaz_admin_session",String(token));if(remember)localStorage.setItem("awaaz_admin_session",String(token));}else{sessionStorage.removeItem("awaaz_admin_session");localStorage.removeItem("awaaz_admin_session");}}catch{}}
 function clearLegacyAdminToken(){try{sessionStorage.removeItem("awaaz_admin_token");sessionStorage.removeItem("awaaz_admin_session");}catch{}try{localStorage.removeItem("awaaz_admin_token");localStorage.removeItem("awaaz_admin_session");}catch{}}
