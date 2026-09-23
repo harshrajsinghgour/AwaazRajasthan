@@ -4,6 +4,7 @@ import "../src/app-production.css";
 import "../src/final-production-polish.css";
 import "../src/production-completion.css";
 import "../src/premium-editorial.css";
+import "../src/elite-editorial.css";
 
 export const metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://awaazrajasthan.vercel.app"),
