@@ -111,10 +111,12 @@ async function sendToSubscribers(news, claimToken) {
   const pending = subscribers.filter(row => row.endpoint && !delivered.has(String(row.endpoint)));
   if (!pending.length) return { sent: 0, removed: 0, retry: 0, remaining: 0, noSubscribers: false };
 
+  const image=Array.isArray(news.image)?String(news.image[0]||""):String(news.image||"");
   const payload = JSON.stringify({
     title: "🔴 ब्रेकिंग न्यूज़ — आवाज़ राजस्थान",
     body: String(news.title || "राजस्थान की बड़ी खबर").slice(0, 180),
     url: newsUrl(news),
+    image,
     tag: `news-${news._id}`,
     renotify: true
   });
