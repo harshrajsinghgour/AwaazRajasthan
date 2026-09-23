@@ -92,3 +92,24 @@ services:
     region: singapore
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
+
+
+  - type: worker
+    name: awaaz-rajasthan-scheduled-publisher
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run scheduled-publisher
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: MEILI_URL
+        sync: false
+      - key: MEILI_MASTER_KEY
+        sync: false
+      - key: MEILI_INDEX
+        value: awaaz_news
+      - key: SCHEDULED_PUBLISH_POLL_MS
+        value: "15000"
