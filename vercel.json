@@ -1,12 +1,8 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "frontend/dist",
-  "installCommand": "npm install",
+  "framework": "nextjs",
+  "buildCommand": "cd frontend && npm run build",
+  "installCommand": "cd frontend && npm install",
   "rewrites": [
-    {
-      "source": "/admin",
-      "destination": "/admin/index.html"
-    },
     {
       "source": "/api/:path*",
       "destination": "https://awaazrajasthan.onrender.com/api/:path*"
@@ -22,22 +18,6 @@
     {
       "source": "/rss.xml",
       "destination": "https://awaazrajasthan.onrender.com/api/rss.xml"
-    },
-    {
-      "source": "/news/:path*",
-      "destination": "/api/share?slug=:path*"
-    },
-    {
-      "source": "/n/:path*",
-      "destination": "/api/n/:path*"
-    },
-    {
-      "source": "/s/:path*",
-      "destination": "/api/s/:path*"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
     }
   ],
   "headers": [
