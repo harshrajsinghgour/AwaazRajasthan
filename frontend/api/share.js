@@ -75,6 +75,24 @@ export default async function handler(req,res){
       "<link rel=\"canonical\" href=\""+esc(canonical)+"\">"
     ];
 
+    const publishedAt=n?.publishedAt||n?.createdAt||new Date().toISOString();
+    const modifiedAt=n?.updatedAt||publishedAt;
+    const articleSchema={
+      "@context":"https://schema.org",
+      "@type":"NewsArticle",
+      "headline":title.slice(0,220),
+      "description":description,
+      "datePublished":new Date(publishedAt).toISOString(),
+      "dateModified":new Date(modifiedAt).toISOString(),
+      "mainEntityOfPage":{"@type":"WebPage","@id":canonical},
+      "author":{"@type":"Organization","name":clean(n.author)||"आवाज़ राजस्थान"},
+      "publisher":{"@type":"Organization","name":"आवाज़ राजस्थान","logo":{"@type":"ImageObject","url":origin+"/awaazrajasthan-logo.png"}},
+      "image":[image]
+    };
+    tags.push("<script type=\"application/ld+json\">"+JSON.stringify(articleSchema).replace(/</g,"\\u003c")+"</script>");
+    tags.push("<meta property=\"article:section\" content=\""+esc(n.category||"राजस्थान")+"\">");
+    const visibleText=clean(n.content||n.excerpt||"").slice(0,12000);
+    const noscript="<noscript><article><h1>"+esc(title)+"</h1><p>"+esc(description)+"</p><div>"+esc(visibleText)+"</div></article></noscript>";
     if(video){
       tags.push("<meta property=\"og:video\" content=\""+esc(new URL(video,origin).href)+"\">");
       tags.push("<meta property=\"og:video:secure_url\" content=\""+esc(new URL(video,origin).href)+"\">");
@@ -84,6 +102,7 @@ export default async function handler(req,res){
     }
 
     out=out.replace(/<head>/i,"<head>\n  "+tags.join("\n  "));
+    out=out.replace(/<\/body>/i,noscript+"</body>");
 
     res.setHeader("Cache-Control","public, s-maxage=300, stale-while-revalidate=900");
     res.setHeader("Content-Type","text/html; charset=utf-8");
