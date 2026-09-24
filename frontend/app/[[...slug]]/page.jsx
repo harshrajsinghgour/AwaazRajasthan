@@ -93,5 +93,5 @@ export default async function Page({ params }) {
     ]
   } : null;
   const initialNews = !isArticle ? await getHomeNews() : [];
-  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}{breadcrumbLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />}<ClientApp initialNews={initialNews} /></>;
+  return <>{jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />}{breadcrumbLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />}<ClientApp initialNews={initialNews} initialArticle={article} /></>;
 }
