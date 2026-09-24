@@ -1,4 +1,5 @@
 // Production build stabilization
+// Media quality and native article-flow hardening are production-locked.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 function shortCodeFromId(id){try{const hex=String(id||"").trim();if(!/^[a-fA-F0-9]{24}$/.test(hex))return "";let bin="";for(let i=0;i<24;i+=2)bin+=String.fromCharCode(parseInt(hex.slice(i,i+2),16));return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}catch{return "";}}
