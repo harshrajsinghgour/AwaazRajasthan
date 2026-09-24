@@ -114,3 +114,124 @@ html,body,#root{min-height:100%!important;height:auto!important;overflow-y:auto!
 .article-content h1{font-size:25px!important;line-height:1.45!important}
 .article-body p{font-size:16px!important;line-height:1.9!important;margin-bottom:18px!important}
 }
+
+
+/* Awaaz Rajasthan — FINAL NATIVE ARTICLE PAGE
+   This rule intentionally wins over every older modal/overlay article rule.
+   The article must use the browser document as its ONLY vertical scroll
+   container on Android, iOS and desktop. */
+html, body {
+  min-height: 100% !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto !important;
+}
+.article-backdrop {
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  width: 100% !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  background: var(--paper, #f5f6f8) !important;
+  touch-action: auto !important;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: auto !important;
+  z-index: 1 !important;
+}
+.article-modal {
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  width: min(920px, 100%) !important;
+  min-width: 0 !important;
+  min-height: 100vh !important;
+  height: auto !important;
+  max-height: none !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: var(--card, #fff) !important;
+  touch-action: auto !important;
+  overscroll-behavior: auto !important;
+}
+.article-toolbar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+}
+.article-cover {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  object-fit: contain !important;
+}
+.article-content {
+  width: 100% !important;
+  max-width: 920px !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 auto !important;
+  overflow: visible !important;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)) !important;
+}
+.article-body {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+.article-body p {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+.article-video,
+.article-video video {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+}
+@media (max-width: 767px) {
+  .article-backdrop {
+    min-height: 100dvh !important;
+    height: auto !important;
+  }
+  .article-modal {
+    width: 100% !important;
+    min-height: 100dvh !important;
+    height: auto !important;
+  }
+  .article-content {
+    padding: 18px 15px calc(115px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  .article-content h1 {
+    font-size: 25px !important;
+    line-height: 1.45 !important;
+  }
+  .article-body p {
+    font-size: 16px !important;
+    line-height: 1.9 !important;
+    margin-bottom: 18px !important;
+  }
+}
