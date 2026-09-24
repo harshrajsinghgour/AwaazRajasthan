@@ -75,7 +75,10 @@ html.article-open,body.article-open{overflow:hidden!important;height:100%!import
 /* FINAL MOBILE ARTICLE SCROLL ARCHITECTURE
    The fixed backdrop is the ONLY scroll container. Keeping scrolling on the
    overlay avoids Android Chrome nested/fixed-container touch gesture issues. */
-.article-backdrop{position:fixed!important;inset:0!important;z-index:120!important;display:block!important;padding:0!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important;touch-action:pan-y!important}
+.article-backdrop{position:fixed!important;inset:0!important;z-index:120!important;display:block!important;padding:0!important;overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-y:contain!important;touch-action:none!important;scrollbar-width:auto!important}
 .article-modal{position:relative!important;width:min(920px,100%)!important;min-height:100dvh!important;height:auto!important;max-height:none!important;margin:0 auto!important;overflow:visible!important;overflow-x:visible!important;overscroll-behavior:initial!important;touch-action:auto!important}
 .article-toolbar{position:sticky!important;top:0!important;z-index:20!important}
 @media(max-width:767px){.article-backdrop{height:100dvh!important}.article-modal{width:100%!important;min-height:100dvh!important;border-radius:0!important}}
+
+/* Touch fallback uses Pointer Events in AppProduction.jsx; prevent browser gesture interception. */
+.article-backdrop,.article-backdrop *{user-select:text;-webkit-user-select:text}
