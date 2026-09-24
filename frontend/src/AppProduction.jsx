@@ -456,6 +456,16 @@ export default function AppProduction({ initialNews = [] }) {
   useEffect(() => { writeStorage("awaaz-bookmarks", JSON.stringify(saved)); writeStorage("awaaz-saved-news", JSON.stringify(savedItems)); }, [saved, savedItems]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
+    const onArticleHistoryChange = () => {
+      if (!window.location.hash.match(/^#news-/) && !/^\/(?:news|n|s)\//.test(window.location.pathname)) {
+        setArticle(null);
+        restoreHomeMeta();
+      }
+    };
+    window.addEventListener("popstate", onArticleHistoryChange);
+    return () => window.removeEventListener("popstate", onArticleHistoryChange);
+  }, []);
+  useEffect(() => {
     const hashMatch = window.location.hash.match(/^#news-(.+)$/);
     const pathMatch = window.location.pathname.match(/^\/(?:news|n|s)\/([^/]+)\/?$/);
     if (!hashMatch && !pathMatch) return;
@@ -527,8 +537,18 @@ ${url}`);
       }
     } catch {}
   }
-  async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
-  function closeArticle() { setArticle(null); const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.pushState({ awaazArticle: true, articleId: String(item.id) }, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
+  function restoreHomeMeta() { document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  function closeArticle() {
+    if (window.history.state?.awaazArticle) {
+      window.history.back();
+      return;
+    }
+    setArticle(null);
+    const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search);
+    if (window.location.pathname !== target) window.history.replaceState(null, "", target);
+    restoreHomeMeta();
+  }
 
   async function enableNotifications() {
     if (!window.isSecureContext && location.hostname !== "localhost") { setNotifyState("error"); setToast("नोटिफिकेशन के लिए HTTPS जरूरी है।"); return; }
