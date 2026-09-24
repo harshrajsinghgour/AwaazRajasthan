@@ -55,7 +55,7 @@ async function uploadMedia(file){
    const headers={};const token=getAdminToken();if(token)headers.Authorization="Bearer "+token;
    const r=await fetch(base+"/api/admin/upload",{method:"POST",credentials:"include",headers,body:form});
    let d={};try{d=await r.json()}catch{}
-   if(r.ok)return new URL(d.url,base||window.location.origin).href;
+   if(r.ok)return String(d.relativeUrl||d.url||"").startsWith("/")?String(d.relativeUrl||d.url):new URL(d.url,base||window.location.origin).href;
    if(r.status===401){const err=new Error(d.message||"Session expired. फिर login करें।");err.status=401;throw err;}
    lastError=new Error(d.message||"Media upload failed");
   }catch(e){if(e?.status===401)throw e;lastError=e;}
