@@ -176,3 +176,12 @@ body.dark .ad-slot.ad-live,.dark .ad-slot.ad-live{background:#151a22;border-colo
     padding:3px!important;
   }
 }
+
+/* Production breaking-news ticker: continuous, touch-safe and pauseable */
+.breaking-inner{overflow:hidden}
+.ticker-viewport{min-width:0;flex:1;overflow:hidden;mask-image:linear-gradient(90deg,transparent 0,#000 20px,#000 calc(100% - 20px),transparent 100%)}
+.ticker-track{display:flex;width:max-content;align-items:center;gap:42px;white-space:nowrap;animation:awaaz-breaking-ticker 32s linear infinite;will-change:transform}
+.ticker-track button{flex:0 0 auto;border:0;background:transparent;color:inherit;font:inherit;white-space:nowrap;cursor:pointer;padding:5px 0}
+.ticker-viewport:hover .ticker-track,.ticker-viewport:focus-within .ticker-track{animation-play-state:paused}
+@keyframes awaaz-breaking-ticker{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 21px))}}
+@media (prefers-reduced-motion:reduce){.ticker-track{animation:none}}

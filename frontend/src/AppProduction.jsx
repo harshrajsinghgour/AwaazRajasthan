@@ -456,6 +456,16 @@ export default function AppProduction({ initialNews = [] }) {
   useEffect(() => { writeStorage("awaaz-bookmarks", JSON.stringify(saved)); writeStorage("awaaz-saved-news", JSON.stringify(savedItems)); }, [saved, savedItems]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
+    const onArticleHistoryChange = () => {
+      if (!window.location.hash.match(/^#news-/) && !/^\/(?:news|n|s)\//.test(window.location.pathname)) {
+        setArticle(null);
+        restoreHomeMeta();
+      }
+    };
+    window.addEventListener("popstate", onArticleHistoryChange);
+    return () => window.removeEventListener("popstate", onArticleHistoryChange);
+  }, []);
+  useEffect(() => {
     const hashMatch = window.location.hash.match(/^#news-(.+)$/);
     const pathMatch = window.location.pathname.match(/^\/(?:news|n|s)\/([^/]+)\/?$/);
     if (!hashMatch && !pathMatch) return;
@@ -527,8 +537,18 @@ ${url}`);
       }
     } catch {}
   }
-  async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.replaceState(null, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
-  function closeArticle() { setArticle(null); const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search); window.history.replaceState(null, "", target); document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  async function openArticle(item, updateHash = true) { setArticle(item); setMenuOpen(false); if (updateHash) window.history.pushState({ awaazArticle: true, articleId: String(item.id) }, "", `#news-${encodeURIComponent(item.id)}`); window.scrollTo({ top: 0, behavior: "smooth" }); document.title = `${item.title} | आवाज़ राजस्थान`; setMeta("description", item.excerpt || "राजस्थान की ताज़ा खबरें — आवाज़ राजस्थान"); setMeta("og:title", item.title, true); setMeta("og:description", item.excerpt || "राजस्थान की ताज़ा खबरें", true); if (String(item.id).startsWith("f")) return; try { const r = await fetch(`${API_BASE}/api/news/${encodeURIComponent(item.id)}`, { headers: { Accept: "application/json" } }); if (!r.ok) return; const data = await r.json(), n = data.news || data.data || data.article || data; setArticle(prev => prev ? { ...prev, ...normalize(n, 0) } : prev); } catch {} }
+  function restoreHomeMeta() { document.title = "आवाज़ राजस्थान | Rajasthan News"; setMeta("description", "आवाज़ राजस्थान — राजस्थान की ताज़ा, स्थानीय और भरोसेमंद खबरें।"); }
+  function closeArticle() {
+    if (window.history.state?.awaazArticle) {
+      window.history.back();
+      return;
+    }
+    setArticle(null);
+    const target = /^\/(?:news|n|s)\//.test(window.location.pathname) ? "/" : (window.location.pathname + window.location.search);
+    if (window.location.pathname !== target) window.history.replaceState(null, "", target);
+    restoreHomeMeta();
+  }
 
   async function enableNotifications() {
     if (!window.isSecureContext && location.hostname !== "localhost") { setNotifyState("error"); setToast("नोटिफिकेशन के लिए HTTPS जरूरी है।"); return; }
@@ -579,7 +599,7 @@ ${url}`);
       <nav className="category-nav" aria-label="मुख्य श्रेणियाँ"><div className="container category-scroll">{categories.map(c => <button key={c} className={category === c && !district ? "active" : ""} onClick={() => selectCategory(c)}>{c === "होम" ? icon("home") : CATEGORY_ICONS[c] || "•"}<span>{c}</span></button>)}</div></nav>
     </header>
     {searchOpen && <section className="search-panel container"><div className="search-box"><span>{icon("search")}</span><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="खबर, शहर, जिला या विषय खोजें..." /><button onClick={() => { setQuery(""); setSearchOpen(false); }}>×</button></div><div className="search-hints"><span>लोकप्रिय:</span>{["जयपुर", "राजस्थान", "अपराध", "खेल", "सरकार"].map(x => <button key={x} onClick={() => { setQuery(x); setSearchOpen(true); }}>{x}</button>)}</div></section>}
-    <div className="breaking-bar"><div className="container breaking-inner"><b>🔴 ब्रेकिंग</b><div className="ticker-track">{breaking.map((n, i) => <button key={`${n.id}-${i}`} onClick={() => openArticle(n)}>{n.title}</button>)}</div></div></div>
+    <div className="breaking-bar"><div className="container breaking-inner"><b>🔴 ब्रेकिंग</b><div className="ticker-viewport" aria-label="ब्रेकिंग न्यूज़"><div className="ticker-track">{[...breaking, ...breaking].map((n, i) => <button key={`${n.id}-${i}`} onClick={() => openArticle(n)}>{n.title}</button>)}</div></div></div></div>
     <AdSlot position="header_strip" className="header-ad" />
     <main id="main-content" className="container main-content"><AdSlot position="home_top" className="top-ad" /><section className="welcome-row"><div><p className="eyebrow">{isHomeView ? "RAJASTHAN • TODAY" : "SELECTED SECTION"}</p><h1>{sectionTitle}</h1><p>तेज़, स्थानीय और जरूरी खबरें — एक ही जगह।</p></div><button className="refresh-btn" onClick={() => window.location.reload()}>{icon("refresh")} ताज़ा करें</button></section>
       <section className="quick-tools" aria-label="त्वरित सुविधाएँ"><a className="quick-tool" href="/ad-booking.html" aria-label="विज्ञापन बुक करें">📢 <span>विज्ञापन बुक करें</span></a><a className="quick-tool" href={E_PAPER_URL}><span>📰</span><span>ई-पेपर</span></a><button className="quick-tool" onClick={() => setNotifyOpen(true)}>🔔 <span>नोटिफिकेशन</span></button><button type="button" data-install-app="true" className={appInstalled ? "quick-tool app-installed" : "quick-tool"} onClick={installApp} aria-label={appInstalled ? "ऐप पहले से इंस्टॉल है" : "ऐप इंस्टॉल करें"}>{appInstalled ? "✅" : "📲"} <span>{appInstalled ? "ऐप इंस्टॉल है" : "ऐप इंस्टॉल करें"}</span></button></section><AdSlot position="after_tools" className="tools-ad" /><div className="device-ad-rail"><AdSlot position="mobile" className="mobile-ad-slot" /><AdSlot position="desktop" className="desktop-ad-slot" /></div><section className="news-type-nav" aria-label="न्यूज़ सेक्शन">{homeButtons.map((button,i)=><button key={button._id||button.action||i} className={feedType===button.action?"active":""} onClick={()=>{const action=button.action||"latest";setFeedType(action==="category"?"latest":action);if(action==="category"&&button.category){setCategory(button.category);setDistrict("");setSavedOnly(false); try { const u=new URL(window.location.href); u.searchParams.set("section",button.category); window.history.replaceState({}, "", u.pathname+"?"+u.searchParams.toString()); } catch {} }}}>{button.icon||"📰"} <span>{button.label}</span></button>)}</section>
