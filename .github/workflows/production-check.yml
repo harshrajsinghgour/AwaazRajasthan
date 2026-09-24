@@ -176,6 +176,8 @@ jobs:
           test "$upload_code" = "401" || { echo "Upload auth boundary failed: /api/admin/upload -> $upload_code"; cat /tmp/upload_response; exit 1; }
           notify_code=$(curl -L -sS -o /tmp/notify_response -w '%{http_code}' --max-time 30 -X POST -H 'Content-Type: application/json' --data '{"endpoint":"http://example.invalid/push","keys":{"p256dh":"x","auth":"y"}}' "$base/api/notifications/subscribe")
           test "$notify_code" = "400" || { echo "Push validation boundary failed: /api/notifications/subscribe -> $notify_code"; cat /tmp/notify_response; exit 1; }
+          join_code=$(curl -L -sS -o /tmp/join_response -w '%{http_code}' --max-time 30 -X POST -H 'Content-Type: application/json' --data '{"name":"Smoke Test","email":"smoke@example.com","mobile":"0000000000","role":"अन्य","website":"bot"}' "$base/api/join-applications")
+          test "$join_code" = "400" || { echo "Join honeypot validation failed: /api/join-applications -> $join_code"; cat /tmp/join_response; exit 1; }
           echo "Render live API + auth boundary smoke OK"
       - name: Verify Vercel public shell and SEO assets
         run: |
