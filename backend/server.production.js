@@ -322,13 +322,13 @@ async function storeUploadedFile(file,folder){
    const image=sharp(body,{failOn:"none"});
    for(const width of [480,960,1440]){
     const key=`${folder}/optimized/${crypto.randomUUID()}-w${width}.webp`;
-    const out=await image.clone().resize({width,withoutEnlargement:true}).webp({quality:78}).toBuffer();
+    const out=await image.clone().resize({width,withoutEnlargement:true}).webp({quality:92}).toBuffer();
     await putB2WithRetry(key,out,"image/webp");
     variants[`w${width}`]=mediaRelative(key);
    }
    try{
     const key=`${folder}/optimized/${crypto.randomUUID()}-w1440.avif`;
-    const out=await image.clone().resize({width:1440,withoutEnlargement:true}).avif({quality:55}).toBuffer();
+    const out=await image.clone().resize({width:1440,withoutEnlargement:true}).avif({quality:80}).toBuffer();
     await putB2WithRetry(key,out,"image/avif");
     variants.avif=mediaRelative(key);
    }catch(error){console.warn("AVIF optimization skipped:",error?.message||error);}
