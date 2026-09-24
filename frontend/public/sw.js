@@ -1,5 +1,5 @@
-const CACHE = "awaaz-rajasthan-v18";
-const NEWS_CACHE = "awaaz-rajasthan-news-v1";
+const CACHE = "awaaz-rajasthan-v19";
+const NEWS_CACHE = "awaaz-rajasthan-news-v2";
 const APP_SHELL = ["/", "/index.html", "/news-placeholder.svg", "/awaazrajasthan-logo.png", "/manifest.webmanifest"];
 
 function safeNotificationUrl(value) {
@@ -74,19 +74,21 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith(".woff2");
 
   if (isStatic) {
+    // Network-first for application assets: never keep an old CSS/JS build
+    // after a production deployment. Fall back to the current cache offline.
     event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const network = fetch(event.request)
-          .then((response) => {
-            if (response && response.ok) {
-              const copy = response.clone();
-              caches.open(CACHE).then((cache) => cache.put(event.request, copy)).catch(() => {});
-            }
-            return response;
-          })
-          .catch(() => cached || new Response("Offline", { status: 503, statusText: "Offline" }));
-        return cached || network;
-      })
+      fetch(event.request)
+        .then(async (response) => {
+          if (response && response.ok) {
+            const cache = await caches.open(CACHE);
+            await cache.put(event.request, response.clone()).catch(() => {});
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          return cached || new Response("Offline", { status: 503, statusText: "Offline" });
+        })
     );
     return;
   }
