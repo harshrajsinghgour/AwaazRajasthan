@@ -551,6 +551,22 @@ export default function AppProduction({ initialNews = [] }) {
   }, []);
   useEffect(() => { writeStorage("awaaz-bookmarks", JSON.stringify(saved)); writeStorage("awaaz-saved-news", JSON.stringify(savedItems)); }, [saved, savedItems]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(""), 2400); return () => clearTimeout(t); }, [toast]);
+  // Article is a full-screen modal on mobile. Lock the background document and
+  // keep the article itself as the only vertical scroll container.
+  useEffect(() => {
+    const body = document.body;
+    const html = document.documentElement;
+    if (!article) return undefined;
+    const previousBodyOverflow = body.style.overflow;
+    const previousHtmlOverflow = html.style.overflow;
+    body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      html.style.overflow = previousHtmlOverflow;
+    };
+  }, [article]);
+
   useEffect(() => {
     const onArticleHistoryChange = () => {
       if (!window.location.hash.match(/^#news-/) && !/^\/(?:news|n|s)\//.test(window.location.pathname)) {
