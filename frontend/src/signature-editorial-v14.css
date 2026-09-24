@@ -185,3 +185,31 @@ body.dark .ad-slot.ad-live,.dark .ad-slot.ad-live{background:#151a22;border-colo
 .ticker-viewport:hover .ticker-track,.ticker-viewport:focus-within .ticker-track{animation-play-state:paused}
 @keyframes awaaz-breaking-ticker{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 21px))}}
 @media (prefers-reduced-motion:reduce){.ticker-track{animation:none}}
+
+/* Mobile home headline: keep the section title in a natural left-to-right line */
+@media (max-width:767px){
+  .welcome-row{
+    display:block!important;
+    width:100%;
+  }
+  .welcome-row>div:first-child{
+    width:100%!important;
+    max-width:none!important;
+  }
+  .welcome-row h1{
+    width:100%!important;
+    max-width:none!important;
+    white-space:normal!important;
+    overflow-wrap:normal!important;
+    word-break:keep-all!important;
+    font-size:clamp(2rem,9vw,2.65rem)!important;
+    line-height:1.08!important;
+    letter-spacing:-.035em!important;
+  }
+  .welcome-row .refresh-btn{
+    display:flex!important;
+    width:100%!important;
+    margin-top:16px;
+    justify-content:center;
+  }
+}
