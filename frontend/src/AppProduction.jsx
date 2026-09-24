@@ -372,7 +372,7 @@ function EpaperPage() {
   </div>;
 }
 
-export default function AppProduction({ initialNews = [] }) {
+export default function AppProduction({ initialNews = [], initialArticle = null }) {
   if(typeof window!=="undefined" && window.location.pathname==="/epaper") return <EpaperPage />;
   const [news, setNews] = useState(() => {
     if (Array.isArray(initialNews) && initialNews.length) return initialNews.map(normalize);
@@ -384,7 +384,7 @@ export default function AppProduction({ initialNews = [] }) {
       const items = readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean);
       return [...new Set([...bookmarks, ...items.map(x => String(x.id))])];
     } catch { return []; }
-  }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
+  }), [categories, setCategories] = useState(DEFAULT_CATEGORIES), [savedItems, setSavedItems] = useState(() => readStorageJson("awaaz-saved-news", []).map(normalizeSavedItem).filter(Boolean)), [savedOnly, setSavedOnly] = useState(false), [districtMenuOpen, setDistrictMenuOpen] = useState(false), [article, setArticle] = useState(() => initialArticle ? normalize(initialArticle, 0) : null), [notifyOpen, setNotifyOpen] = useState(false), [notifyState, setNotifyState] = useState("idle"), [toast, setToast] = useState("");
   const [dark, setDark] = useState(() => readStorage("awaaz-theme", "") === "dark"), [showTop, setShowTop] = useState(false), [installPrompt, setInstallPrompt] = useState(null), [appInstalled, setAppInstalled] = useState(() => typeof window!=="undefined" && (window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true)), [legalSettings, setLegalSettings] = useState(null);
   // First 15-second critical window: warm the API without blocking the first paint.
   useEffect(() => {
