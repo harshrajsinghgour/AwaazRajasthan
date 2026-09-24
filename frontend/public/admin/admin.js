@@ -247,7 +247,7 @@ function exportJoinApplications(){
  if(!joinApplicationsCache.length)return toast("Export करने के लिए कोई application नहीं है।");
  const headers=["Application ID","Name","Email","Mobile","City","District","Role","Status","Experience","Portfolio","Message","Owner Note","Created At"];
  const rows=joinApplicationsCache.map(x=>[x.applicationId,x.name,x.email,x.mobile,x.city,x.district,x.role,x.status,x.experience,x.portfolio,x.message,x.adminNote,formatDate(x.createdAt)]);
- const csv="\\uFEFF"+[headers,...rows].map(row=>row.map(csvCell).join(",")).join("\\r\\n");
+ const csv="\uFEFF"+[headers,...rows].map(row=>row.map(csvCell).join(",")).join("\r\n");
  const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="awaaz-rajasthan-join-applications-"+new Date().toISOString().slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
  toast("Join applications CSV export तैयार है");
