@@ -58,3 +58,15 @@ html[data-theme=dark] body{background:#07111c}html[data-theme=dark] .site-header
   .ticker-group{gap:22px!important;padding:0 22px 0 10px!important}
   .ticker-group button{font-size:10px!important}
 }
+
+
+/* FINAL ARTICLE SCROLL FIX — one scroll container, touch-safe on mobile */
+html.article-open,body.article-open{overflow:hidden!important;height:100%!important}
+.article-backdrop{position:fixed!important;inset:0!important;overflow:hidden!important;padding:0!important;display:block!important;overscroll-behavior:contain!important;touch-action:none!important;-webkit-overflow-scrolling:auto!important}
+.article-modal{position:relative!important;width:min(920px,100%)!important;height:100dvh!important;min-height:100dvh!important;max-height:100dvh!important;margin:0 auto!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior-y:contain!important;-webkit-overflow-scrolling:touch!important;touch-action:pan-y!important}
+.article-toolbar{position:sticky!important;top:0!important;z-index:20!important}
+.article-content{padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))!important}
+@media(max-width:767px){
+  .article-modal{width:100%!important;border-radius:0!important}
+  .article-content{padding-bottom:calc(90px + env(safe-area-inset-bottom,0px))!important}
+}
