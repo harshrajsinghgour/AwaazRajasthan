@@ -1,4 +1,4 @@
-/* Awaaz Rajasthan production release trigger */
+/* Awaaz Rajasthan final production release trigger */
 import React, { Component } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./AppProduction";
