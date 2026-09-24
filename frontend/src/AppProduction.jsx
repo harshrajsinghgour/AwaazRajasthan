@@ -98,6 +98,102 @@ useEffect(() => { let cancelled = false; const timer = window.setTimeout(() => f
   const image = mediaUrl(ad.image || ad.imageUrl || ad.banner); const video = mediaUrl(ad.video || ad.videoUrl || ""); const href = safeAdUrl(ad.link);
   return <a className={`ad-slot ad-live ${className}`} href={href} target="_blank" rel="noreferrer" onClick={() => fetch(`${API_BASE}/api/ads/${ad._id || ad.id}/click`, { method: "POST" }).catch(() => {})}>{video ? <video src={video} poster={image || undefined} controls muted playsInline preload="metadata" aria-label={ad.title || "विज्ञापन वीडियो"} /> : image ? <img src={image} alt={ad.title || "विज्ञापन"} /> : <span>{ad.title || "विज्ञापन"}</span>}</a>;
 }
+function BreakingTicker({ items, onOpen }) {
+  const viewportRef = useRef(null);
+  const trackRef = useRef(null);
+  const groupRef = useRef(null);
+  const frameRef = useRef(0);
+  const lastTimeRef = useRef(0);
+  const offsetRef = useRef(0);
+  const groupWidthRef = useRef(0);
+  const pausedRef = useRef(false);
+
+  const loopItems = useMemo(() => {
+    if (!items?.length) return [];
+    const count = Math.max(16, items.length * 2);
+    return Array.from({ length: count }, (_, index) => items[index % items.length]);
+  }, [items]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    const group = groupRef.current;
+    if (!viewport || !track || !group || !loopItems.length) return;
+
+    const measure = () => {
+      groupWidthRef.current = group.getBoundingClientRect().width;
+      if (groupWidthRef.current > 0 && offsetRef.current <= -groupWidthRef.current) {
+        offsetRef.current = 0;
+      }
+      track.style.transform = `translate3d(${offsetRef.current}px,0,0)`;
+    };
+
+    const resizeObserver = typeof ResizeObserver !== "undefined"
+      ? new ResizeObserver(measure)
+      : null;
+    resizeObserver?.observe(group);
+    resizeObserver?.observe(viewport);
+    measure();
+
+    const speed = () => (window.innerWidth < 768 ? 42 : 52);
+
+    const step = (timestamp) => {
+      if (!lastTimeRef.current) lastTimeRef.current = timestamp;
+      const delta = Math.min(50, timestamp - lastTimeRef.current);
+      lastTimeRef.current = timestamp;
+
+      if (!pausedRef.current && groupWidthRef.current > 0) {
+        offsetRef.current -= speed() * (delta / 1000);
+        if (offsetRef.current <= -groupWidthRef.current) {
+          offsetRef.current += groupWidthRef.current;
+        }
+        track.style.transform = `translate3d(${offsetRef.current}px,0,0)`;
+      }
+
+      frameRef.current = window.requestAnimationFrame(step);
+    };
+
+    frameRef.current = window.requestAnimationFrame(step);
+
+    return () => {
+      window.cancelAnimationFrame(frameRef.current);
+      resizeObserver?.disconnect();
+      lastTimeRef.current = 0;
+    };
+  }, [loopItems]);
+
+  if (!loopItems.length) return null;
+
+  return (
+    <div
+      ref={viewportRef}
+      className="ticker-viewport"
+      aria-label="ब्रेकिंग न्यूज़"
+      onMouseEnter={() => { pausedRef.current = true; }}
+      onMouseLeave={() => { pausedRef.current = false; }}
+      onTouchStart={() => { pausedRef.current = true; }}
+      onTouchEnd={() => { pausedRef.current = false; }}
+    >
+      <div ref={trackRef} className="ticker-track">
+        <div ref={groupRef} className="ticker-group">
+          {loopItems.map((n, i) => (
+            <button key={`ticker-a-${n.id}-${i}`} type="button" onClick={() => onOpen(n)}>
+              {n.title}
+            </button>
+          ))}
+        </div>
+        <div className="ticker-group" aria-hidden="true">
+          {loopItems.map((n, i) => (
+            <button key={`ticker-b-${n.id}-${i}`} type="button" tabIndex={-1} onClick={() => onOpen(n)}>
+              {n.title}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NewsImage({ item, className = "" }) {
   const images=Array.isArray(item?.image)?item.image.filter(Boolean):item?.image?[item.image]:[];
   const [index,setIndex]=useState(0);
@@ -612,7 +708,7 @@ ${url}`);
       <nav className="category-nav" aria-label="मुख्य श्रेणियाँ"><div className="container category-scroll">{categories.map(c => <button key={c} className={category === c && !district ? "active" : ""} onClick={() => selectCategory(c)}>{c === "होम" ? icon("home") : CATEGORY_ICONS[c] || "•"}<span>{c}</span></button>)}</div></nav>
     </header>
     {searchOpen && <section className="search-panel container"><div className="search-box"><span>{icon("search")}</span><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="खबर, शहर, जिला या विषय खोजें..." /><button onClick={() => { setQuery(""); setSearchOpen(false); }}>×</button></div><div className="search-hints"><span>लोकप्रिय:</span>{["जयपुर", "राजस्थान", "अपराध", "खेल", "सरकार"].map(x => <button key={x} onClick={() => { setQuery(x); setSearchOpen(true); }}>{x}</button>)}</div></section>}
-    <div className="breaking-bar"><div className="container breaking-inner"><b>🔴 ब्रेकिंग</b><div className="ticker-viewport" aria-label="ब्रेकिंग न्यूज़"><div className="ticker-track">{[...breaking, ...breaking].map((n, i) => <button key={`${n.id}-${i}`} onClick={() => openArticle(n)}>{n.title}</button>)}</div></div></div></div>
+    <div className="breaking-bar"><div className="container breaking-inner"><b>🔴 ब्रेकिंग</b><BreakingTicker items={breaking} onOpen={openArticle} /></div></div>
     <AdSlot position="header_strip" className="header-ad" />
     <main id="main-content" className="container main-content"><AdSlot position="home_top" className="top-ad" /><section className="welcome-row"><div><p className="eyebrow">{isHomeView ? "RAJASTHAN • TODAY" : "SELECTED SECTION"}</p><h1>{sectionTitle}</h1><p>तेज़, स्थानीय और जरूरी खबरें — एक ही जगह।</p></div><button className="refresh-btn" onClick={() => window.location.reload()}>{icon("refresh")} ताज़ा करें</button></section>
       <section className="quick-tools" aria-label="त्वरित सुविधाएँ"><a className="quick-tool" href="/ad-booking.html" aria-label="विज्ञापन बुक करें">📢 <span>विज्ञापन बुक करें</span></a><a className="quick-tool" href={E_PAPER_URL}><span>📰</span><span>ई-पेपर</span></a><button className="quick-tool" onClick={() => setNotifyOpen(true)}>🔔 <span>नोटिफिकेशन</span></button><button type="button" data-install-app="true" className={appInstalled ? "quick-tool app-installed" : "quick-tool"} onClick={installApp} aria-label={appInstalled ? "ऐप पहले से इंस्टॉल है" : "ऐप इंस्टॉल करें"}>{appInstalled ? "✅" : "📲"} <span>{appInstalled ? "ऐप इंस्टॉल है" : "ऐप इंस्टॉल करें"}</span></button></section><AdSlot position="after_tools" className="tools-ad" /><div className="device-ad-rail"><AdSlot position="mobile" className="mobile-ad-slot" /><AdSlot position="desktop" className="desktop-ad-slot" /></div><section className="news-type-nav" aria-label="न्यूज़ सेक्शन">{homeButtons.map((button,i)=><button key={button._id||button.action||i} className={feedType===button.action?"active":""} onClick={()=>{const action=button.action||"latest";setFeedType(action==="category"?"latest":action);if(action==="category"&&button.category){setCategory(button.category);setDistrict("");setSavedOnly(false); try { const u=new URL(window.location.href); u.searchParams.set("section",button.category); window.history.replaceState({}, "", u.pathname+"?"+u.searchParams.toString()); } catch {} }}}>{button.icon||"📰"} <span>{button.label}</span></button>)}</section>
