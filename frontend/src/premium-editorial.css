@@ -32,3 +32,16 @@ html[data-theme=dark] body{background:#07111c}html[data-theme=dark] .site-header
 .news-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0 4px}
 .news-gallery img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:14px;border:1px solid var(--wa-line,#e7e9ee);background:#eee;display:block}
 @media(min-width:768px){.news-gallery{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
+
+
+/* Critical production ticker override: the breaking-news strip is essential content,
+   so it must keep moving even when a global reduced-motion rule targets other UI animations. */
+.ticker-viewport{display:block!important;min-width:0!important;overflow:hidden!important;position:relative!important}
+.ticker-track{display:flex!important;width:max-content!important;min-width:max-content!important;flex:0 0 auto!important;transform:translate3d(0,0,0);will-change:transform!important;animation-name:tickerScroll!important;animation-duration:28s!important;animation-timing-function:linear!important;animation-iteration-count:infinite!important;animation-direction:normal!important;animation-fill-mode:none!important;animation-play-state:running!important}
+.ticker-track button{flex:0 0 auto!important;white-space:nowrap!important}
+@keyframes tickerScroll{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+@media(max-width:767px){.ticker-track{animation-duration:26s!important}}
+@media(hover:hover){.ticker-viewport:hover .ticker-track{animation-play-state:paused!important}}
+@media(prefers-reduced-motion:reduce){
+  .ticker-track{animation-name:tickerScroll!important;animation-duration:40s!important;animation-iteration-count:infinite!important;animation-play-state:running!important;transform:translate3d(0,0,0)!important}
+}
