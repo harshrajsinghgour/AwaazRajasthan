@@ -6,7 +6,9 @@ export default async function handler(req,res){
   let slug=sharePath; const decoded=idFromShortCode(slug); if(decoded) slug=decoded;
   if(!slug)return res.status(400).send("Missing news slug");
 
-  const origin="https://"+String(req.headers.host||"awaazrajasthan.vercel.app").replace(/\/$/,"");
+  const forwardedProto=String(req.headers["x-forwarded-proto"]||"https").split(",")[0].trim()||"https";
+  const host=String(req.headers.host||"awaazrajasthan.vercel.app").trim();
+  const origin=new URL("/", `${forwardedProto}://${host}`).origin;
   const apiBase=String(process.env.PUBLIC_API_URL||"https://awaazrajasthan.onrender.com").replace(/\/$/,"");
 
   const clean=(v)=>String(v??"").replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ").replace(/\s+/g," ").trim();
