@@ -710,7 +710,7 @@ ${url}`);
     document.body.scrollTop = 0;
   }, [article?.id]);
 
-  return <><div className="awaaz-app">
+  return <><div className={`awaaz-app${article ? " article-route-shell" : ""}`}>
     <a className="skip-link" href="#main-content">मुख्य सामग्री पर जाएँ</a>{!article && <>
     <header className="site-header"><div className="header-top container"><button className="icon-btn menu-btn" onClick={() => setMenuOpen(true)} aria-label="मेनू खोलें">{icon("menu")}</button><Brand /><div className="header-actions"><button className="icon-btn" onClick={() => setSearchOpen(v => !v)} aria-label="खोजें">{icon("search")}</button><button className="icon-btn notification-btn" onClick={() => setNotifyOpen(true)} aria-label="नोटिफिकेशन">{icon("bell")}</button><button className="icon-btn theme-btn" onClick={() => setDark(v => !v)} aria-label="थीम बदलें">{icon(dark ? "sun" : "moon")}</button></div></div>
       <nav className="category-nav" aria-label="मुख्य श्रेणियाँ"><div className="container category-scroll">{categories.map(c => <button key={c} className={category === c && !district ? "active" : ""} onClick={() => selectCategory(c)}>{c === "होम" ? icon("home") : CATEGORY_ICONS[c] || "•"}<span>{c}</span></button>)}</div></nav>
