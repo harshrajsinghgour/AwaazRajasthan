@@ -510,7 +510,20 @@ export default function AppProduction({ initialNews = [] }) {
     return (pool.length ? pool : chromeNews).slice(0, 8);
   }, [chromeNews]);
   const sectionTitle = district ? `${district} की खबरें` : savedOnly ? "सेव की गई खबरें" : feedType === "breaking" ? "ब्रेकिंग न्यूज़" : feedType === "trending" ? "ट्रेंडिंग खबरें" : feedType === "video" ? "वीडियो न्यूज़" : feedType === "photo" ? "फोटो न्यूज़" : category === "होम" ? "राजस्थान की ताज़ा खबरें" : `${category} की खबरें`;
-  const relatedNews = useMemo(() => {\n    if (!article) return [];\n    const currentId = String(article.id || "");\n    const candidates = news.filter(n => String(n.id || "") !== currentId);\n    const relevant = candidates.filter(n => (article.category && n.category === article.category) || (article.location && n.location === article.location));\n    const seen = new Set();\n    return [...relevant, ...candidates].filter(n => {\n      const id = String(n.id || n.slug || "");\n      if (!id || seen.has(id)) return false;\n      seen.add(id);\n      return true;\n    }).slice(0, 6);\n  }, [article, news]);\n
+  const relatedNews = useMemo(() => {
+    if (!article) return [];
+    const currentId = String(article.id || "");
+    const candidates = news.filter(n => String(n.id || "") !== currentId);
+    const relevant = candidates.filter(n => (article.category && n.category === article.category) || (article.location && n.location === article.location));
+    const seen = new Set();
+    return [...relevant, ...candidates].filter(n => {
+      const id = String(n.id || n.slug || "");
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).slice(0, 6);
+  }, [article, news]);
+
   function selectCategory(value) { if (value === "सभी जिले") { setDistrictMenuOpen(true); setCategory("होम"); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(true); setSearchOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); return; } setDistrictMenuOpen(false); setCategory(value); setFeedType("latest"); setDistrict(""); setSavedOnly(false); setMenuOpen(false); setSearchOpen(false); try { const u = new URL(window.location.href); u.searchParams.delete("section"); if (value !== "होम") u.searchParams.set("section", value); window.history.replaceState({}, "", u.pathname + (u.search || "")); } catch {} window.scrollTo({ top: 0, behavior: "smooth" }); }
   function toggleSave(id) { const key = String(id); const exists = saved.includes(key); if (exists) { const nextSaved = saved.filter(x => String(x) !== key); const nextItems = savedItems.filter(x => String(x.id || x._id) !== key); setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव से हटाई गई"); } else { const item = news.find(n => String(n.id || n._id) === key) || (article && String(article.id || article._id) === key ? article : null); if (!item) return; const nextSaved = [key, ...saved.filter(x => String(x) !== key)]; const nextItems = [item, ...savedItems.filter(x => String(x.id || x._id) !== key)]; setSaved(nextSaved); setSavedItems(nextItems); writeStorage("awaaz-bookmarks", JSON.stringify(nextSaved)); writeStorage("awaaz-saved-news", JSON.stringify(nextItems)); setToast("खबर सेव हो गई"); } }
   async function share(item) {
