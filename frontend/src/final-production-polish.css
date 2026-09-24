@@ -56,3 +56,15 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{ou
   .mobile-bottom-nav{display:none!important}
   .article-modal{min-height:100vh}
 }
+
+
+/* Awaaz Rajasthan — continuous breaking-news ticker fix */
+.breaking-inner{min-width:0}
+.ticker-viewport{min-width:0;flex:1;overflow:hidden;position:relative;white-space:nowrap}
+.ticker-track{display:flex;width:max-content;min-width:max-content;flex:0 0 auto;gap:28px;overflow:visible;scrollbar-width:none;padding:0 15px;will-change:transform;animation:tickerScroll 28s linear infinite}
+.ticker-track::-webkit-scrollbar{display:none}
+.ticker-track button{flex:0 0 auto;white-space:nowrap}
+@keyframes tickerScroll{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+@media(max-width:767px){.ticker-track{gap:22px;padding:0 10px;animation-duration:26s}}
+@media(hover:hover){.ticker-viewport:hover .ticker-track{animation-play-state:paused}}
+@media(prefers-reduced-motion:reduce){.ticker-track{animation:none!important;transform:none!important;overflow-x:auto}}
