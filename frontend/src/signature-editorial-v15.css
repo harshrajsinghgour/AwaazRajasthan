@@ -80,3 +80,17 @@ body{background:var(--wa15-bg)}
 @media(prefers-reduced-motion:reduce){
   .category-nav button,.drawer-links button,.drawer-links a,.site-footer a,.site-footer button{transition:none!important}
 }
+
+
+/* FINAL TICKER OVERRIDE — this stylesheet is imported last by Next.js.
+   The ticker is driven by requestAnimationFrame in AppProduction, so CSS
+   animation must never compete with the JS transform. */
+.breaking-inner{min-width:0!important;overflow:hidden!important}
+.ticker-viewport{display:block!important;min-width:0!important;flex:1 1 auto!important;overflow:hidden!important;position:relative!important;white-space:nowrap!important}
+.ticker-track{display:flex!important;width:max-content!important;min-width:max-content!important;flex:0 0 auto!important;gap:0!important;overflow:visible!important;animation:none!important;scrollbar-width:none!important;will-change:transform!important}
+.ticker-group{display:flex!important;align-items:center!important;gap:28px!important;flex:0 0 auto!important;padding:0 28px 0 15px!important;white-space:nowrap!important}
+.ticker-group button{flex:0 0 auto!important;border:0!important;background:transparent!important;color:#fff!important;white-space:nowrap!important;font-size:12px!important;font-weight:800!important;padding:0!important;margin:0!important;cursor:pointer!important}
+@media(max-width:767px){
+  .ticker-group{gap:22px!important;padding:0 22px 0 10px!important}
+  .ticker-group button{font-size:10.5px!important}
+}
