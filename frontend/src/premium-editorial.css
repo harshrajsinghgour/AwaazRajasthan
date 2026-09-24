@@ -235,3 +235,7 @@ html, body {
     margin-bottom: 18px !important;
   }
 }
+
+
+/* ARTICLE ROUTE: hide the empty home shell while a news article is active. */
+.awaaz-app.article-route-shell{display:none!important;min-height:0!important;height:0!important;overflow:hidden!important}
